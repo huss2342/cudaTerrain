@@ -1,12 +1,45 @@
 #include <stdio.h>
 
-// CUDA kernel function to print "Hello World"
-// __global__ void helloFromGPU()
-// {
-//     // Get the thread ID
-//     int threadId = threadIdx.x;
-//     printf("Hello World from GPU thread %d!\n", threadId);
-// }
+#define TERRAIN_TYPE(name, id, label, r, g, b) \
+    __constant__ TerrainType name = {id, label, {r, g, b}}
+
+// terrain types
+namespace TerrainTypes {
+
+    TERRAIN_TYPE(WATER,    0,  "Water",    0,   0,   255);
+    TERRAIN_TYPE(SAND,     1,  "Sand",     255, 255, 0  );
+    TERRAIN_TYPE(GRASS,    2,  "Grass",    0,   255, 0  );
+    TERRAIN_TYPE(ROCK,     3,  "Rock",     128, 128, 128);
+    TERRAIN_TYPE(SNOW,     4,  "Snow",     255, 255, 255);
+    TERRAIN_TYPE(LAVA,     5,  "Lava",     255, 0,   0  );
+    TERRAIN_TYPE(ICE,      6,  "Ice",      0,   255, 255);
+    TERRAIN_TYPE(MUD,      7,  "Mud",      139, 69,  19 );
+    TERRAIN_TYPE(FOREST,   8,  "Forest",   0,   100, 0  );
+    TERRAIN_TYPE(DESERT,   9,  "Desert",   255, 165, 0  );
+    TERRAIN_TYPE(MOUNTAIN, 10, "Mountain", 139, 69,  19 );
+    TERRAIN_TYPE(SWAMP,    11, "Swamp",    46,  139, 87 );
+    TERRAIN_TYPE(JUNGLE,   12, "Jungle",   34,  139, 34 );
+    TERRAIN_TYPE(TUNDRA,   13, "Tundra",   0,   128, 128);
+    TERRAIN_TYPE(SAVANNA,  14, "Savanna",  218, 165, 32 );
+    TERRAIN_TYPE(TAIGA,    15, "Taiga",    0,   128, 0  );
+    TERRAIN_TYPE(STEPPE,   16, "Steppe",   210, 180, 140);
+    TERRAIN_TYPE(PRAIRIE,  17, "Prairie",  255, 228, 196);
+    TERRAIN_TYPE(PLATEAU,  18, "Plateau",  205, 133, 63 );
+    TERRAIN_TYPE(CANYON,   19, "Canyon",   139, 69,  19 );
+    TERRAIN_TYPE(BADLANDS, 20, "Badlands", 139, 69,  19 );
+    TERRAIN_TYPE(MESA,     21, "Mesa",     139, 69,  19 );
+    TERRAIN_TYPE(OASIS,    22, "Oasis",    0,   255, 127);
+    TERRAIN_TYPE(VOLCANO,  23, "Volcano",  255, 0,   0  );
+    TERRAIN_TYPE(GLACIER,  24, "Glacier",  0,   255, 255);
+    TERRAIN_TYPE(FJORD,    25, "Fjord",    0,   0,   255);
+    TERRAIN_TYPE(BAY,      26, "Bay",      0,   0,   255);
+    TERRAIN_TYPE(COVE,     27, "Cove",     0,   0,   255);
+    TERRAIN_TYPE(BEACH,    28, "Beach",    255, 255, 0  );
+    TERRAIN_TYPE(CLIFF,    29, "Cliff",    139, 69,  19 );
+    TERRAIN_TYPE(DUNE,     30, "Dune",     255, 255, 0 );
+    
+    #undef TERRAIN_TYPE
+}
 
 struct TerrainType {
     int id;
@@ -55,7 +88,7 @@ int main() {
     printf("Hello World from CPU!\n");
     
     // Launch the kernel with 5 threads
-    helloFromGPU<<<1, 5>>>();
+    // helloFromGPU<<<1, 5>>>();
     
     // Wait for GPU to finish before exiting
     cudaDeviceSynchronize();
@@ -63,12 +96,12 @@ int main() {
     return 0;
 }
 
-void renderTerrain(int* terrain, int width, int height) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int terrainType = terrain[y * width + x];
-            Color color = getColorForTerrainType(terrainType);
-            drawPixel(x, y, color);
-        }
-    }
-}
+// void renderTerrain(int* terrain, int width, int height) {
+//     for (int y = 0; y < height; y++) {
+//         for (int x = 0; x < width; x++) {
+//             int terrainType = terrain[y * width + x];
+//             Color color = getColorForTerrainType(terrainType);
+//             drawPixel(x, y, color);
+//         }
+//     }
+// }
