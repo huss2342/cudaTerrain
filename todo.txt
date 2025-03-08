@@ -1,0 +1,6 @@
+Phase 1: Implement basic 2D terrain generation with a single algorithm (start with Perlin noise)
+Phase 2: Add multiple terrain types and coloring
+Phase 3: Implement walkability layer
+Phase 4: Add more complex algorithms (cellular automata for caves, Voronoi for biomes)
+Phase 5: Add height values (z dimension) to create a 2.5D representation
+Phase 6: Implement more advanced features (rivers, roads, etc.)
