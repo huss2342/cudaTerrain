@@ -1,12 +1,12 @@
-Phase 1: Implement basic 2D terrain generation with a single algorithm (start with Perlin noise maybe)
-Phase 2: Add multiple terrain types and coloring
-Phase 3: Implement walkability layer
-Phase 4: Add more complex algorithms (cellular automata for caves, Voronoi for biomes)?
-Phase 5: Add height values (z dimension) to create a 2.5D representation 
+[] Phase 1: Implement basic 2D terrain generation with a single algorithm (start with Perlin noise maybe)
+[] Phase 2: Add multiple terrain types and coloring
+[] Phase 3: Implement walkability layer
+[] Phase 4: Add more complex algorithms (cellular automata for caves, Voronoi for biomes)?
+[] Phase 5: Add height values (z dimension) to create a 2.5D representation 
                 (with paths to reach height or have some blocked off )
-Phase 6: Implement a randomly placed landmark (flag..) on the map
-Phase 7: Implement more advanced features (rivers, roads, etc.)
+[] Phase 6: Implement a randomly placed landmark (flag..) on the map
+[] Phase 7: Implement more advanced features (rivers, roads, etc.)
 
 
-Phase 0.1: Implement a simple player movement system
-Phase 0.2: Implement a simple pathfinding algorithm (A* maybe) to determine a path from the player to the landmark
+[] Phase 0.1: Implement a simple player movement system
+[] Phase 0.2: Implement a simple pathfinding algorithm (A* maybe) to determine a path from the player to the landmark
