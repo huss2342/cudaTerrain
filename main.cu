@@ -115,7 +115,7 @@ __device__ float grad(int hash, float x, float y, float z) {
     }
 }
 
-// ======================== Main ========================
+// ======================== Main =======================
 int main() {
     for (int i = 0; i <= DUNE; i++) {
         const TerrainType* terrain = TerrainTypes::getTerrainById(i);
