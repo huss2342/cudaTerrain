@@ -117,9 +117,6 @@ __device__ float grad(int hash, float x, float y, float z) {
 
 // ======================== Main ========================
 int main() {
-    printf("Hello World from CPU!\n");
-    
-    // const TerrainType* terrain = TerrainTypes::getTerrainById(GRASS);
     for (int i = 0; i <= DUNE; i++) {
         const TerrainType* terrain = TerrainTypes::getTerrainById(i);
         printf("terrain: %s (RGB: %d,%d,%d)\n", 
