@@ -38,7 +38,9 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
     }
 }
 
-void createPerlinNoiseTerrain(int* d_terrain, int width, int height, float scale, float offsetX, float offsetY) {
+void createPerlinNoiseTerrain(int* d_terrain, int width, int height, 
+                              float scale, float offsetX, float offsetY) {
+
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
     

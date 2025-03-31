@@ -9,6 +9,19 @@
 #include "../include/visualization.h"
 
 int main() {
+    // generate a random seed then split it to X and Y offsets
+    
+
+    int seed = time(NULL);
+    srand(seed);
+    // seed = 123; // Uncomment for reproducibility
+
+    float randomOffsetX = (seed % 100) * 1.27f;
+    float randomOffsetY = (seed % 100) * 2.53f; 
+
+    printf("Generated terrain with seed: %d\n", seed);
+    printf("Offsets: X=%f, Y=%f\n", randomOffsetX, randomOffsetY);
+
     // Initialize terrain types
     TerrainTypes::initializeTerrainTypes();
 
@@ -27,9 +40,10 @@ int main() {
     unsigned char* d_image;
     cudaMalloc(&d_terrain, size);
     cudaMalloc(&d_image, imageSize);
-    
+    int scale = 8.0f;
+
     // Generate terrain
-    createPerlinNoiseTerrain(d_terrain, width, height);
+    createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
     
     // Visualize terrain
     dim3 blockSize(16, 16);
