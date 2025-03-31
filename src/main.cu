@@ -8,10 +8,9 @@
 #include "../include/terrain_gen.h"
 #include "../include/visualization.h"
 
-extern void initializeTerrainTypes();
-
 int main() {
-    initializeTerrainTypes();
+    // Initialize terrain types
+    TerrainTypes::initializeTerrainTypes();
 
     // Define terrain size
     int width = 1024;

@@ -1,6 +1,7 @@
 #include "../include/perlin_noise.h"
 #include <math.h>
 
+// Define permutation table
 __device__ __constant__ int permutation[256] = {
     151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225,
     140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148,
@@ -20,6 +21,7 @@ __device__ __constant__ int permutation[256] = {
     222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180
 };
 
+// Helper functions with proper __device__ attribute
 __device__ float fade(float t) {
     return t * t * t * (t * (t * 6 - 15) + 10);
 }
@@ -29,28 +31,13 @@ __device__ float lerp(float a, float b, float t) {
 }
 
 __device__ float grad(int hash, float x, float y, float z) {
-    switch(hash & 0xF)
-    {
-        case 0x0: return  x + y;
-        case 0x1: return -x + y;
-        case 0x2: return  x - y;
-        case 0x3: return -x - y;
-        case 0x4: return  x + z;
-        case 0x5: return -x + z;
-        case 0x6: return  x - z;
-        case 0x7: return -x - z;
-        case 0x8: return  y + z;
-        case 0x9: return -y + z;
-        case 0xA: return  y - z;
-        case 0xB: return -y - z;
-        case 0xC: return  y + x;
-        case 0xD: return -y + z;
-        case 0xE: return  y - x;
-        case 0xF: return -y - z;
-        default: return 0; // never happens
-    }
+    int h = hash & 15;
+    float u = h < 8 ? x : y;
+    float v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
+    return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
+// Main noise function implementation
 __device__ float noise(float x, float y, float z) {
     // Find unit cube that contains the point
     int X = (int)floorf(x) & 255;

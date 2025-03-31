@@ -17,9 +17,14 @@ enum TerrainId {
 };
 
 namespace TerrainTypes {
-    // Change the declaration to this
-    extern __constant__ TerrainType TERRAINS[];
-    __device__ __host__ inline const TerrainType* getTerrainById(int id);
+    // Declare as extern in the header
+    extern __constant__ TerrainType TERRAINS[31];
+    
+    // Function to initialize the constant memory
+    void initializeTerrainTypes();
+    
+    // Device and host function to get terrain by id
+    __device__ __host__ const TerrainType* getTerrainById(int id);
 }
 
 #endif // TERRAIN_TYPES_H
