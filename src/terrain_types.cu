@@ -7,7 +7,7 @@ __constant__ TerrainType TerrainTypes::TERRAINS[31];
 static const TerrainType terrainData[31] = {
     {0,  "Water",    {0,   0,   255}},
     {1,  "Sand",     {255, 255, 0  }},
-    {2,  "Grass",    {0,   255, 0  }},
+    {2,  "Grass",    {0,   200, 0  }},
     {3,  "Rock",     {128, 128, 128}},
     {4,  "Snow",     {255, 255, 255}},
     {5,  "Lava",     {255, 0,   0  }},

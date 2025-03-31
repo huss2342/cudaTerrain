@@ -40,7 +40,7 @@ int main() {
     unsigned char* d_image;
     cudaMalloc(&d_terrain, size);
     cudaMalloc(&d_image, imageSize);
-    int scale = 8.0f;
+    int scale = 16.0f;
 
     // Generate terrain
     createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
