@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cuda_runtime.h>
+#include <iostream>
 
 #include "../include/terrain_types.h"
 #include "../include/perlin_noise.h"
@@ -40,16 +41,20 @@ int main() {
     unsigned char* d_image;
     cudaMalloc(&d_terrain, size);
     cudaMalloc(&d_image, imageSize);
-    int scale = 16.0f;
+    int scale = 0.1f;
+    printf("Enter scale for terrain generation (e.g., 0.1): ");
+    std::cin >> scale; 
 
     // Generate terrain
     createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
-    
+    std::cout << "Terrain generated with scale: " << scale << std::endl;
+
     // Visualize terrain
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
     visualizeTerrain<<<gridSize, blockSize>>>(d_terrain, d_image, width, height);
-    
+    std::cout << "Terrain visualization kernel launched." << std::endl;
+
     // Copy results back to host
     cudaMemcpy(h_terrain, d_terrain, size, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_image, d_image, imageSize, cudaMemcpyDeviceToHost);
