@@ -57,7 +57,7 @@ namespace TerrainTypes {
     }
 }
 
-// ======================== Perlin Noise ========================
+// ======================== Perlin Noise Functions ========================
 /*
 https://adrianb.io/2014/08/09/perlinnoise.html
 Basic kernel that generates perlin noise
@@ -115,12 +115,166 @@ __device__ float grad(int hash, float x, float y, float z) {
     }
 }
 
+__device__ float noise(float x, float y, float z) {
+    // Find unit cube that contains the point
+    int X = (int)floorf(x) & 255;
+    int Y = (int)floorf(y) & 255;
+    int Z = (int)floorf(z) & 255;
+    
+    // Find relative x, y, z of point in cube
+    x -= floorf(x);
+    y -= floorf(y);
+    z -= floorf(z);
+    
+    // Compute fade curves for each of x, y, z
+    float u = fade(x);
+    float v = fade(y);
+    float w = fade(z);
+    
+    // Hash coordinates of the 8 cube corners
+    int A = permutation[X] + Y;
+    int AA = permutation[A] + Z;
+    int AB = permutation[A + 1] + Z;
+    int B = permutation[X + 1] + Y;
+    int BA = permutation[B] + Z;
+    int BB = permutation[B + 1] + Z;
+    
+    // Add blended results from 8 corners of cube
+    return lerp(
+        lerp(
+            lerp(grad(permutation[AA], x, y, z),
+                 grad(permutation[BA], x-1, y, z), u),
+            lerp(grad(permutation[AB], x, y-1, z),
+                 grad(permutation[BB], x-1, y-1, z), u), v),
+        lerp(
+            lerp(grad(permutation[AA+1], x, y, z-1),
+                 grad(permutation[BA+1], x-1, y, z-1), u),
+            lerp(grad(permutation[AB+1], x, y-1, z-1),
+                 grad(permutation[BB+1], x-1, y-1, z-1), u), v), w);
+}
+
+// A kernel function to generate terrain based on Perlin noise
+__global__ void generateTerrain(int* terrain, int width, int height, float scale, float offsetX, float offsetY) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (x < width && y < height) {
+        // Generate noise value
+        float nx = (float)x / width * scale + offsetX;
+        float ny = (float)y / height * scale + offsetY;
+        // Fixed z value for 2D terrain
+        float nz = 0.0f;
+        
+        // Get noise value between -1 and 1
+        float value = noise(nx, ny, nz);
+        
+        // Scale to 0 to 1 range
+        value = (value + 1.0f) * 0.5f;
+        
+        // Map noise to terrain types (simple example)
+        int terrainType;
+        if (value < 0.2f) {
+            terrainType = WATER;
+        } else if (value < 0.3f) {
+            terrainType = SAND;
+        } else if (value < 0.7f) {
+            terrainType = GRASS;
+        } else if (value < 0.8f) {
+            terrainType = ROCK;
+        } else {
+            terrainType = SNOW;
+        }
+        
+        // Store terrain type in output array
+        terrain[y * width + x] = terrainType;
+    }
+}
+
+
+// Helper function to launch the kernel
+void createPerlinNoiseTerrain(int* d_terrain, int width, int height, float scale = 8.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
+    dim3 blockSize(16, 16);
+    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+    
+    generateTerrain<<<gridSize, blockSize>>>(d_terrain, width, height, scale, offsetX, offsetY);
+}
+// ======================== Visualize ======================
+
+// Add this function to map Perlin noise to RGB colors for visualization
+__global__ void visualizeTerrain(int* terrain, unsigned char* image, int width, int height) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (x < width && y < height) {
+        int idx = y * width + x;
+        int terrainType = terrain[idx];
+        
+        // Get the color from the terrain type
+        const TerrainType* terrainInfo = TerrainTypes::getTerrainById(terrainType);
+        
+        // Set RGB values in image (assuming 3 channels)
+        image[idx * 3 + 0] = terrainInfo->color.r;
+        image[idx * 3 + 1] = terrainInfo->color.g;
+        image[idx * 3 + 2] = terrainInfo->color.b;
+    }
+}
+
+// Function to save the image to a PPM file (simple format for testing)
+void saveToPPM(const char* filename, unsigned char* image, int width, int height) {
+    FILE* fp = fopen(filename, "wb");
+    if (!fp) {
+        fprintf(stderr, "Failed to open file for writing: %s\n", filename);
+        return;
+    }
+    
+    // Write PPM header
+    fprintf(fp, "P6\n%d %d\n255\n", width, height);
+    
+    // Write image data
+    fwrite(image, 3, width * height, fp);
+    
+    fclose(fp);
+    printf("Saved terrain image to %s\n", filename);
+}
+
 // ======================== Main ======================
 int main() {
-    for (int i = 0; i <= DUNE; i++) {
-        const TerrainType* terrain = TerrainTypes::getTerrainById(i);
-        printf("terrain: %s (RGB: %d,%d,%d)\n", 
-            terrain->name, terrain->color.r, terrain->color.g, terrain->color.b);
-    }
+    // Define terrain size
+    int width = 1024;
+    int height = 1024;
+    int size = width * height * sizeof(int);
+    int imageSize = width * height * 3 * sizeof(unsigned char); // RGB
+    
+    // Allocate host memory
+    int* h_terrain = (int*)malloc(size);
+    unsigned char* h_image = (unsigned char*)malloc(imageSize);
+    
+    // Allocate device memory
+    int* d_terrain;
+    unsigned char* d_image;
+    cudaMalloc(&d_terrain, size);
+    cudaMalloc(&d_image, imageSize);
+    
+    // Generate terrain
+    createPerlinNoiseTerrain(d_terrain, width, height);
+    
+    // Visualize terrain
+    dim3 blockSize(16, 16);
+    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+    visualizeTerrain<<<gridSize, blockSize>>>(d_terrain, d_image, width, height);
+    
+    // Copy results back to host
+    cudaMemcpy(h_terrain, d_terrain, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_image, d_image, imageSize, cudaMemcpyDeviceToHost);
+    
+    // Save image to file
+    saveToPPM("terrain.ppm", h_image, width, height);
+    
+    // Clean up
+    free(h_terrain);
+    free(h_image);
+    cudaFree(d_terrain);
+    cudaFree(d_image);
+    
     return 0;
 }
