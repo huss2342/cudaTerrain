@@ -3,5 +3,5 @@ main.lib
 main.exp
 tempCodeRunnerFile.exp
 tempCodeRunnerFile.lib
-terrain.ppm
 *.ppm
+terrain.ppm
