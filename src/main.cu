@@ -7,6 +7,7 @@
 #include "../include/perlin_noise.h"
 #include "../include/terrain_gen.h"
 #include "../include/visualization.h"
+#include "../include/connectivity.h"
 
 int main(int argc, char** argv) {
     // Parse command line arguments for scale and size
@@ -72,6 +73,9 @@ int main(int argc, char** argv) {
     // Generate terrain
     createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
     
+    // Connecting the landmasses
+    connectLandmasses(d_terrain, width, height);
+
     // Visualize terrain
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
