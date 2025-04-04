@@ -30,7 +30,7 @@ echo [4/5] Compilation successful!
 :: Run the program
 echo [5/5] Running the program...
 cd bin
-main.exe << 1
+main.exe 4.0
 cd ..
 
 echo ========== Build and Run Complete ==========

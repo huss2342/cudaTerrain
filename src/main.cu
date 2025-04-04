@@ -2,17 +2,44 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cuda_runtime.h>
-#include <iostream>
 
 #include "../include/terrain_types.h"
 #include "../include/perlin_noise.h"
 #include "../include/terrain_gen.h"
 #include "../include/visualization.h"
 
-int main() {
-    // generate a random seed then split it to X and Y offsets
+int main(int argc, char** argv) {
+    // Parse command line arguments for scale and size
+    float scale = 8.0f; // Default value
+    int size = 1024;   // Default size
     
-
+    if (argc > 1) {
+        // Try to parse the first argument as the scale
+        float inputScale = atof(argv[1]);
+        if (inputScale > 0.0f) {
+            scale = inputScale;
+            printf("Using provided scale: %f\n", scale);
+        } else {
+            printf("Invalid scale value provided. Using default scale: %f\n", scale);
+        }
+    } else {
+        printf("No scale provided. Using default scale: %f\n", scale);
+    }
+    
+    // Check for size parameter
+    if (argc > 2) {
+        int inputSize = atoi(argv[2]);
+        if (inputSize > 0 && inputSize <= 4096) { // Limit max size to prevent excessive memory usage
+            size = inputSize;
+            printf("Using provided size: %d x %d\n", size, size);
+        } else {
+            printf("Invalid or too large size provided. Using default size: %d x %d\n", size, size);
+        }
+    } else {
+        printf("No size provided. Using default size: %d x %d\n", size, size);
+    }
+    
+    // Generate a random seed then split it to X and Y offsets
     int seed = time(NULL);
     srand(seed);
     // seed = 123; // Uncomment for reproducibility
@@ -27,40 +54,44 @@ int main() {
     TerrainTypes::initializeTerrainTypes();
 
     // Define terrain size
-    int width = 1024;
-    int height = 1024;
-    int size = width * height * sizeof(int);
+    int width = size;
+    int height = size;
+    int memSize = width * height * sizeof(int);
     int imageSize = width * height * 3 * sizeof(unsigned char); // RGB
     
     // Allocate host memory
-    int* h_terrain = (int*)malloc(size);
+    int* h_terrain = (int*)malloc(memSize);
     unsigned char* h_image = (unsigned char*)malloc(imageSize);
     
     // Allocate device memory
     int* d_terrain;
     unsigned char* d_image;
-    cudaMalloc(&d_terrain, size);
+    cudaMalloc(&d_terrain, memSize);
     cudaMalloc(&d_image, imageSize);
-    int scale = 0.1f;
-    printf("Enter scale for terrain generation (e.g., 0.1): ");
-    std::cin >> scale; 
-
+    
     // Generate terrain
     createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
-    std::cout << "Terrain generated with scale: " << scale << std::endl;
-
+    
     // Visualize terrain
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
     visualizeTerrain<<<gridSize, blockSize>>>(d_terrain, d_image, width, height);
-    std::cout << "Terrain visualization kernel launched." << std::endl;
-
+    
     // Copy results back to host
-    cudaMemcpy(h_terrain, d_terrain, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_terrain, d_terrain, memSize, cudaMemcpyDeviceToHost);
     cudaMemcpy(h_image, d_image, imageSize, cudaMemcpyDeviceToHost);
     
+    // Create output filename with scale and size information
+    char filename[100];
+    sprintf(filename, "terrain_scale%.1f_size%d.ppm", scale, size);
+    
     // Save image to file
-    saveToPPM("terrain.ppm", h_image, width, height);
+    saveToPPM(filename, h_image, width, height);
+    
+    // Print a message about the improvements with corrected scale explanation
+    printf("Generated multi-scale terrain with enhanced detail.\n");
+    printf("Scale: %.1f - Lower values = zoomed out (larger features), Higher values = zoomed in (smaller features)\n", scale);
+    printf("Saved terrain to %s\n", filename);
     
     // Clean up
     free(h_terrain);
