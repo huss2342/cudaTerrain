@@ -7,7 +7,6 @@
 #include "../include/perlin_noise.h"
 #include "../include/terrain_gen.h"
 #include "../include/visualization.h"
-#include "../include/connectivity.h"
 
 int main(int argc, char** argv) {
     // Parse command line arguments for scale and size
@@ -80,11 +79,10 @@ int main(int argc, char** argv) {
     }
 
     // Connecting the landmasses
-    connectLandmasses(d_terrain, width, height);
+    // connectLandmasses(d_terrain, width, height);
     cudaError_t error2 = cudaGetLastError();
     if (error2 != cudaSuccess) {
         printf("CUDA error: %s\n", cudaGetErrorString(error2));
-        // Handle error appropriately
     }
     // Visualize terrain
     dim3 blockSize(16, 16);

@@ -18,7 +18,6 @@ nvcc -rdc=true -G ^
 src/main.cu ^
 src/terrain_types.cu ^
 src/terrain_gen.cu ^
-src/connectivity.cu ^
 src/perlin_noise.cu ^
 src/visualization.cu -o bin/main
 
