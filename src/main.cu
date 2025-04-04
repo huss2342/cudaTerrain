@@ -72,10 +72,20 @@ int main(int argc, char** argv) {
     
     // Generate terrain
     createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
-    
+   
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        printf("CUDA error: %s\n", cudaGetErrorString(error));
+        // Handle error appropriately
+    }
+
     // Connecting the landmasses
     connectLandmasses(d_terrain, width, height);
-
+    cudaError_t error2 = cudaGetLastError();
+    if (error2 != cudaSuccess) {
+        printf("CUDA error: %s\n", cudaGetErrorString(error2));
+        // Handle error appropriately
+    }
     // Visualize terrain
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);

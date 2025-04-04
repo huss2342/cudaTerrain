@@ -44,11 +44,20 @@ void createConnectivityNetwork(int* d_terrain, int* d_regions, int width, int he
     for (int i = 1; i <= 7; i++) {
         int x = i * gridSpacing;
         createVerticalPath<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, x);
+        cudaError_t error4 = cudaGetLastError();
+        if (error4 != cudaSuccess) {
+            printf("CUDA error4: %s\n", cudaGetErrorString(error4));
+        }
+    
     }
     
     for (int j = 1; j <= 7; j++) {
         int y = j * gridSpacing;
         createHorizontalPath<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, y);
+        cudaError_t error5 = cudaGetLastError();
+        if (error5 != cudaSuccess) {
+            printf("CUDA error5: %s\n", cudaGetErrorString(error5));
+        }
     }
 }
 
@@ -244,9 +253,21 @@ void connectLandmasses(int* d_terrain, int width, int height) {
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
     
+    cudaError_t error1 = cudaGetLastError();
+    if (error1 != cudaSuccess) {
+        printf("CUDA error1 at %s: %s\n", "operation_name", cudaGetErrorString(error1));
+        return; // Exit early to avoid further errors
+    }
+
     // Identify walkable terrain
     identifyWalkableTerrain<<<gridSize, blockSize>>>(d_terrain, d_walkable, width, height);
     
+    cudaError_t error2 = cudaGetLastError();
+    if (error2 != cudaSuccess) {
+        printf("CUDA error3 at %s: %s\n", "operation_name", cudaGetErrorString(error2));
+        return; // Exit early to avoid further errors
+    }
+
     // Perform flood fill to identify regions
     floodFill(d_walkable, d_regions, width, height);
     
@@ -278,6 +299,12 @@ void connectLandmasses(int* d_terrain, int width, int height) {
         // Create pathway between the regions
         createPathways<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, 
                                               i, i+1, x1, y1, x2, y2);
+
+        cudaError_t error3 = cudaGetLastError();
+        if (error3 != cudaSuccess) {
+            printf("CUDA error3 at %s: %s; in for loop with i = %d\n", "operation_name", cudaGetErrorString(error3), i);
+            return; // Exit early to avoid further errors
+        }
     }
     
     // Clean up
