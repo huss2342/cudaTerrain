@@ -9,382 +9,104 @@
 #include <vector>
 #include <algorithm>
 
-// CUDA kernel to identify walkable terrain
-__global__ void identifyWalkableTerrain(int* terrain, int* walkable, int width, int height) {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+// Function to expand existing walkable areas
+void expandWalkableAreas(int* d_terrain, int width, int height) {
+    printf("Expanding existing walkable areas...\n");
     
-    if (x < width && y < height) {
-        int idx = y * width + x;
-        int terrainType = terrain[idx];
+    // Allocate host memory for terrain modification
+    int* h_terrain = new int[width * height];
+    int* h_output = new int[width * height];
+    
+    // Copy terrain data to host
+    cudaMemcpy(h_terrain, d_terrain, width * height * sizeof(int), cudaMemcpyDeviceToHost);
+    memcpy(h_output, h_terrain, width * height * sizeof(int));
+    
+    // Define the most important walkable terrain types
+    const int primaryWalkables[] = {GRASS, FOREST, 
+                                    //PRAIRIE, STEPPE, SAND, BEACH
+                                    };
+    const int numPrimaryTypes = sizeof(primaryWalkables) / sizeof(primaryWalkables[0]);
+    
+    // Iteration count - how many expansion passes to perform
+    const int expansionPasses = 5;
+    
+    // For each pass, expand outward
+    for (int pass = 0; pass < expansionPasses; pass++) {
+        printf("Expansion pass %d/%d...\n", pass + 1, expansionPasses);
         
-        // Check if terrain is walkable (not water and not steep)
-        if (terrainType != WATER && terrainType != BAY && 
-            terrainType != FJORD && terrainType != COVE &&
-            terrainType != MOUNTAIN && terrainType != CLIFF && 
-            terrainType != VOLCANO && terrainType != GLACIER &&
-            terrainType != MESA && terrainType != CANYON) {
-            walkable[idx] = 1; // Walkable
-        } else {
-            walkable[idx] = 0; // Not walkable
-        }
-    }
-}
-
-
-// Create a more comprehensive connectivity network
-void createConnectivityNetwork(int* d_terrain, int* d_regions, int width, int height, int maxRegion) {
-    // Create a grid of major "highways" across the map
-    int gridSpacing = width / 8; // 8 vertical and horizontal paths
-    
-    dim3 blockSize(16, 16);
-    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
-    
-    // Create horizontal and vertical paths at regular intervals
-    for (int i = 1; i <= 7; i++) {
-        int x = i * gridSpacing;
-        createVerticalPath<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, x);
-        cudaError_t error4 = cudaGetLastError();
-        if (error4 != cudaSuccess) {
-            printf("CUDA error4: %s\n", cudaGetErrorString(error4));
-        }
-    
-    }
-    
-    for (int j = 1; j <= 7; j++) {
-        int y = j * gridSpacing;
-        createHorizontalPath<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, y);
-        cudaError_t error5 = cudaGetLastError();
-        if (error5 != cudaSuccess) {
-            printf("CUDA error5: %s\n", cudaGetErrorString(error5));
-        }
-    }
-}
-
-// Kernel to create a vertical path
-__global__ void createVerticalPath(int* terrain, int* regions, int width, int height, int x) {
-    int threadX = blockIdx.x * blockDim.x + threadIdx.x;
-    int threadY = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if (threadX < width && threadY < height) {
-        // Define path width
-        int pathWidth = 40;
-        
-        // Check if this point is on the vertical path
-        if (abs(threadX - x) <= pathWidth) {
-            int idx = threadY * width + threadX;
-            int terrainType = terrain[idx];
-            
-            // Only replace water
-            if (terrainType == WATER || terrainType == BAY || 
-                terrainType == FJORD || terrainType == COVE) {
-                terrain[idx] = GRASS;
-                regions[idx] = 1; // Assign to region 1
-            }
-        }
-    }
-}
-
-// Kernel to create a horizontal path
-__global__ void createHorizontalPath(int* terrain, int* regions, int width, int height, int y) {
-    // Similar to createVerticalPath but for horizontal lines
-    int threadX = blockIdx.x * blockDim.x + threadIdx.x;
-    int threadY = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if (threadX < width && threadY < height) {
-        int pathWidth = 40;
-        
-        if (abs(threadY - y) <= pathWidth) {
-            int idx = threadY * width + threadX;
-            int terrainType = terrain[idx];
-            
-            if (terrainType == WATER || terrainType == BAY || 
-                terrainType == FJORD || terrainType == COVE) {
-                terrain[idx] = GRASS;
-                regions[idx] = 1;
-            }
-        }
-    }
-}
-
-// Function to perform flood fill to identify regions
-void floodFill(int* walkable, int* regions, int width, int height) {
-    // Copy data to host for CPU-based flood fill
-    thrust::host_vector<int> h_walkable(width * height);
-    thrust::host_vector<int> h_regions(width * height, 0);
-    thrust::copy(walkable, walkable + width * height, h_walkable.begin());
-    
-    // Initialize variables
-    int regionCount = 0;
-    std::vector<std::pair<int, int>> dirs;
-    dirs.push_back(std::make_pair(0, 1));
-    dirs.push_back(std::make_pair(1, 0));
-    dirs.push_back(std::make_pair(0, -1));
-    dirs.push_back(std::make_pair(-1, 0));
-    
-    // Perform flood fill
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int idx = y * width + x;
-            
-            // If walkable and not assigned to a region yet
-            if (h_walkable[idx] == 1 && h_regions[idx] == 0) {
-                regionCount++;
+        // For each pixel
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                int idx = y * width + x;
+                int terrainType = h_terrain[idx];
                 
-                // BFS flood fill
-                std::queue<std::pair<int, int>> queue;
-                queue.push(std::make_pair(x, y));
-                h_regions[idx] = regionCount;
+                // Skip if this is already a walkable terrain
+                const TerrainType* terrainInfo = TerrainTypes::getTerrainById(terrainType);
+                if (terrainInfo && terrainInfo->walkable) {
+                    continue;
+                }
                 
-                while (!queue.empty()) {
-                    std::pair<int, int> front = queue.front();
-                    int cx = front.first;
-                    int cy = front.second;
-                    queue.pop();
+                // Check neighbors (8-connected)
+                static const int dx[] = {-1, 0, 1, -1, 1, -1, 0, 1};
+                static const int dy[] = {-1, -1, -1, 0, 0, 1, 1, 1};
+                
+                // Count occurrences of each primary terrain type in neighbors
+                int typeCounts[numPrimaryTypes] = {0};
+                
+                for (int d = 0; d < 8; d++) {
+                    int nx = x + dx[d];
+                    int ny = y + dy[d];
                     
-                    // Check all 4 neighbors
-                    for (size_t d = 0; d < dirs.size(); d++) {
-                        int nx = cx + dirs[d].first;
-                        int ny = cy + dirs[d].second;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        int nidx = ny * width + nx;
+                        int neighborType = h_terrain[nidx];
                         
-                        // Check bounds
-                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                            int nidx = ny * width + nx;
-                            
-                            // If walkable and not assigned to a region yet
-                            if (h_walkable[nidx] == 1 && h_regions[nidx] == 0) {
-                                h_regions[nidx] = regionCount;
-                                queue.push(std::make_pair(nx, ny));
+                        // Count this neighbor's type
+                        for (int t = 0; t < numPrimaryTypes; t++) {
+                            if (neighborType == primaryWalkables[t]) {
+                                typeCounts[t]++;
+                                break;
                             }
                         }
                     }
                 }
+                
+                // Find which walkable type has the most neighbors
+                int bestTypeIdx = -1;
+                int maxCount = 0;
+                
+                for (int t = 0; t < numPrimaryTypes; t++) {
+                    if (typeCounts[t] > maxCount) {
+                        maxCount = typeCounts[t];
+                        bestTypeIdx = t;
+                    }
+                }
+                
+                // If there's at least one walkable neighbor, expand it
+                if (bestTypeIdx >= 0 && maxCount >= 1) {
+                    h_output[idx] = primaryWalkables[bestTypeIdx];
+                }
             }
         }
+        
+        // Copy expanded terrain for next pass
+        memcpy(h_terrain, h_output, width * height * sizeof(int));
     }
     
-    // Copy regions back to device
-    thrust::copy(h_regions.begin(), h_regions.end(), regions);
+    // Copy modified terrain back to device
+    cudaMemcpy(d_terrain, h_output, width * height * sizeof(int), cudaMemcpyHostToDevice);
+    
+    delete[] h_terrain;
+    delete[] h_output;
+    printf("Walkable area expansion completed\n");
 }
 
-// Kernel to create pathways between regions
-__global__ void createPathways(int* terrain, int* regions, int width, int height, 
-    int region1, int region2, int pathX1, int pathY1, 
-    int pathX2, int pathY2) {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (x < width && y < height) {
-        int idx = y * width + x;
-
-        // Path width
-        float pathWidth = 40.0f;
-
-        // First create horizontal segment
-        bool onHorizontalPath = (y >= fminf(pathY1, pathY2) - pathWidth && 
-            y <= fmaxf(pathY1, pathY2) + pathWidth &&
-            x >= fminf(pathX1, pathX2) - pathWidth && 
-            x <= fmaxf(pathX1, pathX2) + pathWidth);
-
-        // Check if this point is on the path
-        if (onHorizontalPath) {
-        // Only replace non-walkable terrain
-        int terrainType = terrain[idx];
-        if (terrainType == WATER || terrainType == BAY || 
-            terrainType == FJORD || terrainType == COVE) {
-                terrain[idx] = GRASS;
-                regions[idx] = region1;
-            }
-        }
-    }
-}
-
-// Function to find closest points between two regions
-void findClosestPoints(int* regions, int width, int height, int region1, int region2,
-    int& x1, int& y1, int& x2, int& y2) {
-    thrust::host_vector<int> h_regions(width * height);
-    thrust::copy(regions, regions + width * height, h_regions.begin());
-
-    std::vector<std::pair<int, int>> points1;
-    std::vector<std::pair<int, int>> points2;
-
-    // Collect points from each region
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int idx = y * width + x;
-            if (h_regions[idx] == region1) {
-                points1.push_back(std::make_pair(x, y));
-            } else if (h_regions[idx] == region2) {
-                points2.push_back(std::make_pair(x, y));
-            }
-        }
-    }
-
-    // Check if either region is empty
-    if (points1.empty() || points2.empty()) {
-        printf("Warning: One of the regions is empty. Region1 size: %zu, Region2 size: %zu\n", 
-        points1.size(), points2.size());
-
-        // Set default values at the center of the map to avoid crashes
-        x1 = width / 2;
-        y1 = height / 2;
-        x2 = width / 2;
-        y2 = height / 2;
-        return;
-    }
-
-    // Find closest pair of points
-    float minDist = INFINITY;
-    bool foundPair = false;
-
-    for (size_t i = 0; i < points1.size(); i++) {
-        const std::pair<int, int>& p1 = points1[i];
-        for (size_t j = 0; j < points2.size(); j++) {
-            const std::pair<int, int>& p2 = points2[j];
-            float dist = sqrtf(powf(p1.first - p2.first, 2) + powf(p1.second - p2.second, 2));
-            if (dist < minDist) {
-                minDist = dist;
-                x1 = p1.first;
-                y1 = p1.second;
-                x2 = p2.first;
-                y2 = p2.second;
-                foundPair = true;
-            }
-        }
-    }
-
-    // Double-check that we found a valid pair
-    if (!foundPair) {
-        printf("Warning: Could not find a valid pair of points between regions %d and %d\n", 
-        region1, region2);
-        // Set default values
-        x1 = width / 2;
-        y1 = height / 2;
-        x2 = width / 2;
-        y2 = height / 2;
-    }
-}
-
-// Main function to connect landmasses
+// Main connectivity function now uses expansion instead of paths
 void connectLandmasses(int* d_terrain, int width, int height) {
-    printf("Starting connectLandmasses function...\n");
+    printf("Starting area expansion for better playability...\n");
     
-    // Allocate memory for walkable and region maps
-    int* d_walkable;
-    int* d_regions;
-    cudaError_t err;
+    // Simply expand the existing walkable areas
+    expandWalkableAreas(d_terrain, width, height);
     
-    err = cudaMalloc(&d_walkable, width * height * sizeof(int));
-    if (err != cudaSuccess) {
-        printf("CUDA malloc failed for d_walkable: %s\n", cudaGetErrorString(err));
-        return;
-    }
-    
-    err = cudaMalloc(&d_regions, width * height * sizeof(int));
-    if (err != cudaSuccess) {
-        printf("CUDA malloc failed for d_regions: %s\n", cudaGetErrorString(err));
-        cudaFree(d_walkable);
-        return;
-    }
-    
-    // Initialize regions to 0
-    err = cudaMemset(d_regions, 0, width * height * sizeof(int));
-    if (err != cudaSuccess) {
-        printf("CUDA memset failed: %s\n", cudaGetErrorString(err));
-        cudaFree(d_walkable);
-        cudaFree(d_regions);
-        return;
-    }
-    
-    printf("Memory allocated successfully\n");
-    
-    // CUDA kernel configuration
-    dim3 blockSize(16, 16);
-    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
-    
-    // Identify walkable terrain
-    printf("Identifying walkable terrain...\n");
-    identifyWalkableTerrain<<<gridSize, blockSize>>>(d_terrain, d_walkable, width, height);
-    
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("CUDA error in identifyWalkableTerrain: %s\n", cudaGetErrorString(err));
-        cudaFree(d_walkable);
-        cudaFree(d_regions);
-        return;
-    }
-    
-    // Wait for kernel to finish
-    cudaDeviceSynchronize();
-    
-    // Perform flood fill to identify regions
-    printf("Performing flood fill...\n");
-    floodFill(d_walkable, d_regions, width, height);
-    
-    // Find the number of regions
-    thrust::device_vector<int> d_regions_vec(d_regions, d_regions + width * height);
-    
-    // Check if thrust operation succeeded
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("CUDA error in thrust operation: %s\n", cudaGetErrorString(err));
-        cudaFree(d_walkable);
-        cudaFree(d_regions);
-        return;
-    }
-    
-    int maxRegion = 0;
-    try {
-        maxRegion = *thrust::max_element(d_regions_vec.begin(), d_regions_vec.end());
-    }
-    catch (std::exception& e) {
-        printf("Exception in thrust::max_element: %s\n", e.what());
-        cudaFree(d_walkable);
-        cudaFree(d_regions);
-        return;
-    }
-    
-    printf("Found %d separate land regions\n", maxRegion);
-    
-    // If there's only one region or no regions, we're done
-    if (maxRegion <= 1) {
-        printf("No disconnected regions found, no paths needed\n");
-        cudaFree(d_walkable);
-        cudaFree(d_regions);
-        return;
-    }
-    
-    // Create a simple spanning tree to connect regions
-    printf("Creating paths between regions...\n");
-    for (int i = 1; i < maxRegion; i++) {
-        int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
-        
-        // Find closest points between regions i and i+1
-        printf("Finding closest points between regions %d and %d...\n", i, i+1);
-        findClosestPoints(d_regions, width, height, i, i+1, x1, y1, x2, y2);
-        
-        printf("Connecting region %d to region %d with path from (%d,%d) to (%d,%d)\n", 
-               i, i+1, x1, y1, x2, y2);
-        
-        // Create pathway between the regions
-        createPathways<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, 
-                                              i, i+1, x1, y1, x2, y2);
-
-        err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("CUDA error in createPathways: %s\n", cudaGetErrorString(err));
-            cudaFree(d_walkable);
-            cudaFree(d_regions);
-            return;
-        }
-        
-        // Wait for kernel to finish
-        cudaDeviceSynchronize();
-    }
-    
-    printf("All regions connected successfully\n");
-    
-    // Clean up
-    cudaFree(d_walkable);
-    cudaFree(d_regions);
+    printf("Area expansion completed\n");
 }

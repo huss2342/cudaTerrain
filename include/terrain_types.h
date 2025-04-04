@@ -7,6 +7,7 @@ struct TerrainType {
     int id;
     const char* name;
     struct { int r, g, b; } color;
+    bool walkable;
 };
 
 enum TerrainId {
