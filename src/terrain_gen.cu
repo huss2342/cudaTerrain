@@ -45,14 +45,15 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
         float variation = distributedNoise(nx + 200.0f, ny + 200.0f, 2.0f, 4);
         
         // Optionally bias the elevation to reduce extremes:
-        elevation = elevation * 0.8f + 0.1f;
+        // elevation = elevation * 1.0f + 0.1f;
+        elevation = elevation * 1.2f;
         
         float hash = (elevation * 13.0f + moisture * 17.0f + variation * 19.0f) * 100.0f;
         int hashInt = (int)hash;
         int terrainType = abs(hashInt % 31);
         
         // Raise mountain threshold to reduce harsh mountain edges
-        if (elevation > 0.99f) {
+        if (elevation > 0.999999f) {
             if (hashInt % 4 == 0) {
                 terrainType = MOUNTAIN;
             } else if (hashInt % 4 == 1) {
@@ -63,7 +64,7 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
                 terrainType = CLIFF;
             }
         }
-        else if (elevation < 0.01f) {
+        else if (elevation < 0.000001f) {
             if (hashInt % 4 == 0) {
                 terrainType = WATER;
             } else if (hashInt % 4 == 1) {
