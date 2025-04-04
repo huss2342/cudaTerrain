@@ -5,14 +5,10 @@
 
 // Enhanced noise function with better distribution of values
 __device__ float enhancedNoise(float x, float y, float z) {
-    // Get base Perlin noise value
     float val = noise(x, y, z);
-    
-    // Apply non-linear transformation to expand the "interesting" range
-    // This emphasizes the mid-range values where most terrain variation happens
-    val = (val + 1.0f) * 0.5f; // Convert from [-1,1] to [0,1]
-    val = powf(val, 0.8f);     // Apply slight curve to distribute values better
-    
+    val = (val + 1.0f) * 0.5f;
+    // Use a milder transformation
+    val = powf(val, 0.9f);
     return val;
 }
 
@@ -25,17 +21,15 @@ __device__ float distributedNoise(float x, float y, float z, int octaves) {
     
     for(int i = 0; i < octaves; i++) {
         total += enhancedNoise(x * frequency, y * frequency, z) * amplitude;
-        
         maxValue += amplitude;
-        amplitude *= 0.5f;
+        amplitude *= 0.6f;  // slower decay
         frequency *= 2.0f;
     }
     
-    // Normalize to [0,1] range
     total /= maxValue;
-    
     return total;
 }
+
 
 // Improved terrain generation with modulo approach to ensure all terrain types appear
 __global__ void generateTerrain(int* terrain, int width, int height, float scale, float offsetX, float offsetY) {
@@ -43,27 +37,22 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     
     if (x < width && y < height) {
-        // Base coordinates - use higher frequencies for more detail
         float nx = (float)x / width * scale + offsetX;
         float ny = (float)y / height * scale + offsetY;
         
-        // Generate multiple noise layers with different seeds for variety
-        float elevation = distributedNoise(nx, ny, 0.0f, 8); // Increased octaves for more detail
+        float elevation = distributedNoise(nx, ny, 0.0f, 8);
         float moisture = distributedNoise(nx + 100.0f, ny + 100.0f, 1.0f, 6);
         float variation = distributedNoise(nx + 200.0f, ny + 200.0f, 2.0f, 4);
         
-        // Use modulo approach to ensure all terrain types appear
-        // Create a hash value from the noise values to get distribution across all terrain types
+        // Optionally bias the elevation to reduce extremes:
+        elevation = elevation * 0.8f + 0.1f;
+        
         float hash = (elevation * 13.0f + moisture * 17.0f + variation * 19.0f) * 100.0f;
         int hashInt = (int)hash;
+        int terrainType = abs(hashInt % 31);
         
-        // Use abs() to handle negative values and modulo to ensure we get all terrain types
-        int terrainType = abs(hashInt % 31); // 31 is the total number of terrain types
-        
-        // Add some clustering to make the terrain less random/noisy
-        // Higher elevation areas tend to be peaks/mountains
-        if (elevation > 0.85f) {
-            // High elevation areas
+        // Raise mountain threshold to reduce harsh mountain edges
+        if (elevation > 0.9f) {
             if (hashInt % 4 == 0) {
                 terrainType = MOUNTAIN;
             } else if (hashInt % 4 == 1) {
@@ -74,9 +63,7 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
                 terrainType = CLIFF;
             }
         }
-        // Water areas for lower elevation
         else if (elevation < 0.15f) {
-            // Low elevation areas
             if (hashInt % 4 == 0) {
                 terrainType = WATER;
             } else if (hashInt % 4 == 1) {
@@ -87,7 +74,6 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
                 terrainType = COVE;
             }
         }
-        // Desert areas for dry regions
         else if (elevation < 0.4f && moisture < 0.3f) {
             if (hashInt % 3 == 0) {
                 terrainType = DESERT;
@@ -97,12 +83,11 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
                 terrainType = DUNE;
             }
         }
-        // For areas that don't match specific conditions, use the modulo approach
         
-        // Store terrain type
         terrain[y * width + x] = terrainType;
     }
 }
+
 
 void createPerlinNoiseTerrain(int* d_terrain, int width, int height, 
                              float scale, float offsetX, float offsetY) {
