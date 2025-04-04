@@ -201,13 +201,13 @@ __global__ void createPathways(int* terrain, int* regions, int width, int height
 
 // Function to find closest points between two regions
 void findClosestPoints(int* regions, int width, int height, int region1, int region2,
-                     int& x1, int& y1, int& x2, int& y2) {
+    int& x1, int& y1, int& x2, int& y2) {
     thrust::host_vector<int> h_regions(width * height);
     thrust::copy(regions, regions + width * height, h_regions.begin());
-    
+
     std::vector<std::pair<int, int>> points1;
     std::vector<std::pair<int, int>> points2;
-    
+
     // Collect points from each region
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
@@ -219,10 +219,24 @@ void findClosestPoints(int* regions, int width, int height, int region1, int reg
             }
         }
     }
-    
+
+    // Check if either region is empty
+    if (points1.empty() || points2.empty()) {
+        printf("Warning: One of the regions is empty. Region1 size: %zu, Region2 size: %zu\n", 
+        points1.size(), points2.size());
+
+        // Set default values at the center of the map to avoid crashes
+        x1 = width / 2;
+        y1 = height / 2;
+        x2 = width / 2;
+        y2 = height / 2;
+        return;
+    }
+
     // Find closest pair of points
     float minDist = INFINITY;
-    
+    bool foundPair = false;
+
     for (size_t i = 0; i < points1.size(); i++) {
         const std::pair<int, int>& p1 = points1[i];
         for (size_t j = 0; j < points2.size(); j++) {
@@ -234,46 +248,101 @@ void findClosestPoints(int* regions, int width, int height, int region1, int reg
                 y1 = p1.second;
                 x2 = p2.first;
                 y2 = p2.second;
+                foundPair = true;
             }
         }
+    }
+
+    // Double-check that we found a valid pair
+    if (!foundPair) {
+        printf("Warning: Could not find a valid pair of points between regions %d and %d\n", 
+        region1, region2);
+        // Set default values
+        x1 = width / 2;
+        y1 = height / 2;
+        x2 = width / 2;
+        y2 = height / 2;
     }
 }
 
 // Main function to connect landmasses
 void connectLandmasses(int* d_terrain, int width, int height) {
+    printf("Starting connectLandmasses function...\n");
+    
     // Allocate memory for walkable and region maps
     int* d_walkable;
     int* d_regions;
-    cudaMalloc(&d_walkable, width * height * sizeof(int));
-    cudaMalloc(&d_regions, width * height * sizeof(int));
+    cudaError_t err;
     
-    thrust::fill(thrust::device, d_regions, d_regions + width * height, 0);
+    err = cudaMalloc(&d_walkable, width * height * sizeof(int));
+    if (err != cudaSuccess) {
+        printf("CUDA malloc failed for d_walkable: %s\n", cudaGetErrorString(err));
+        return;
+    }
+    
+    err = cudaMalloc(&d_regions, width * height * sizeof(int));
+    if (err != cudaSuccess) {
+        printf("CUDA malloc failed for d_regions: %s\n", cudaGetErrorString(err));
+        cudaFree(d_walkable);
+        return;
+    }
+    
+    // Initialize regions to 0
+    err = cudaMemset(d_regions, 0, width * height * sizeof(int));
+    if (err != cudaSuccess) {
+        printf("CUDA memset failed: %s\n", cudaGetErrorString(err));
+        cudaFree(d_walkable);
+        cudaFree(d_regions);
+        return;
+    }
+    
+    printf("Memory allocated successfully\n");
     
     // CUDA kernel configuration
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
     
-    cudaError_t error1 = cudaGetLastError();
-    if (error1 != cudaSuccess) {
-        printf("CUDA error1 at %s: %s\n", "operation_name", cudaGetErrorString(error1));
-        return; // Exit early to avoid further errors
-    }
-
     // Identify walkable terrain
+    printf("Identifying walkable terrain...\n");
     identifyWalkableTerrain<<<gridSize, blockSize>>>(d_terrain, d_walkable, width, height);
     
-    cudaError_t error2 = cudaGetLastError();
-    if (error2 != cudaSuccess) {
-        printf("CUDA error3 at %s: %s\n", "operation_name", cudaGetErrorString(error2));
-        return; // Exit early to avoid further errors
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA error in identifyWalkableTerrain: %s\n", cudaGetErrorString(err));
+        cudaFree(d_walkable);
+        cudaFree(d_regions);
+        return;
     }
-
+    
+    // Wait for kernel to finish
+    cudaDeviceSynchronize();
+    
     // Perform flood fill to identify regions
+    printf("Performing flood fill...\n");
     floodFill(d_walkable, d_regions, width, height);
     
     // Find the number of regions
     thrust::device_vector<int> d_regions_vec(d_regions, d_regions + width * height);
-    int maxRegion = *thrust::max_element(d_regions_vec.begin(), d_regions_vec.end());
+    
+    // Check if thrust operation succeeded
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA error in thrust operation: %s\n", cudaGetErrorString(err));
+        cudaFree(d_walkable);
+        cudaFree(d_regions);
+        return;
+    }
+    
+    int maxRegion = 0;
+    try {
+        maxRegion = *thrust::max_element(d_regions_vec.begin(), d_regions_vec.end());
+    }
+    catch (std::exception& e) {
+        printf("Exception in thrust::max_element: %s\n", e.what());
+        cudaFree(d_walkable);
+        cudaFree(d_regions);
+        return;
+    }
     
     printf("Found %d separate land regions\n", maxRegion);
     
@@ -286,11 +355,12 @@ void connectLandmasses(int* d_terrain, int width, int height) {
     }
     
     // Create a simple spanning tree to connect regions
-    // For simplicity, we'll just connect region i to region i+1
+    printf("Creating paths between regions...\n");
     for (int i = 1; i < maxRegion; i++) {
         int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
         
         // Find closest points between regions i and i+1
+        printf("Finding closest points between regions %d and %d...\n", i, i+1);
         findClosestPoints(d_regions, width, height, i, i+1, x1, y1, x2, y2);
         
         printf("Connecting region %d to region %d with path from (%d,%d) to (%d,%d)\n", 
@@ -300,12 +370,19 @@ void connectLandmasses(int* d_terrain, int width, int height) {
         createPathways<<<gridSize, blockSize>>>(d_terrain, d_regions, width, height, 
                                               i, i+1, x1, y1, x2, y2);
 
-        cudaError_t error3 = cudaGetLastError();
-        if (error3 != cudaSuccess) {
-            printf("CUDA error3 at %s: %s; in for loop with i = %d\n", "operation_name", cudaGetErrorString(error3), i);
-            return; // Exit early to avoid further errors
+        err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("CUDA error in createPathways: %s\n", cudaGetErrorString(err));
+            cudaFree(d_walkable);
+            cudaFree(d_regions);
+            return;
         }
+        
+        // Wait for kernel to finish
+        cudaDeviceSynchronize();
     }
+    
+    printf("All regions connected successfully\n");
     
     // Clean up
     cudaFree(d_walkable);
