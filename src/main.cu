@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     }
     
     // Generate a random seed then split it to X and Y offsets
-    int seed = time(NULL);
+    int seed = time(NULL); // Random seed based on current time
     srand(seed);
     // seed = 123; // Uncomment for reproducibility
 
