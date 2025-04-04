@@ -52,7 +52,7 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
         int terrainType = abs(hashInt % 31);
         
         // Raise mountain threshold to reduce harsh mountain edges
-        if (elevation > 0.98f) {
+        if (elevation > 0.99f) {
             if (hashInt % 4 == 0) {
                 terrainType = MOUNTAIN;
             } else if (hashInt % 4 == 1) {
@@ -63,7 +63,7 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
                 terrainType = CLIFF;
             }
         }
-        else if (elevation < 0.15f) {
+        else if (elevation < 0.01f) {
             if (hashInt % 4 == 0) {
                 terrainType = WATER;
             } else if (hashInt % 4 == 1) {
@@ -74,7 +74,7 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
                 terrainType = COVE;
             }
         }
-        else if (elevation < 0.4f && moisture < 0.3f) {
+        else if (elevation < 0.3f && moisture < 0.3f) {
             if (hashInt % 3 == 0) {
                 terrainType = DESERT;
             } else if (hashInt % 3 == 1) {

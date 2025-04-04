@@ -1,4 +1,5 @@
 @echo off
+
 echo ========== TerrainCraft Build Script ==========
 
 :: Create bin directory if it doesn't exist
@@ -30,7 +31,7 @@ echo [4/5] Compilation successful!
 :: Run the program
 echo [5/5] Running the program...
 cd bin
-main.exe 4.0 4096
+main.exe 1.0 4096
 cd ..
 
 echo ========== Build and Run Complete ==========

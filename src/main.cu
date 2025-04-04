@@ -10,8 +10,8 @@
 
 int main(int argc, char** argv) {
     // Parse command line arguments for scale and size
-    float scale = 8.0f; // Default value
-    int size = 1024;   // Default size
+    float scale = 1.0f;  // Default value
+    int size = 4096;   // Default size
     
     if (argc > 1) {
         // Try to parse the first argument as the scale
