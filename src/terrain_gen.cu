@@ -37,88 +37,79 @@ __device__ float distributedNoise(float x, float y, float z, int octaves) {
     return total;
 }
 
-// Improved terrain generation with histogramming
+// Improved terrain generation with modulo approach to ensure all terrain types appear
 __global__ void generateTerrain(int* terrain, int width, int height, float scale, float offsetX, float offsetY) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     
     if (x < width && y < height) {
-        // Base coordinates
+        // Base coordinates - use higher frequencies for more detail
         float nx = (float)x / width * scale + offsetX;
         float ny = (float)y / height * scale + offsetY;
         
-        // Generate elevation and moisture with different seeds
-        float elevation = distributedNoise(nx, ny, 0.0f, 6);
-        float moisture = distributedNoise(nx + 100.0f, ny + 100.0f, 1.0f, 4);
+        // Generate multiple noise layers with different seeds for variety
+        float elevation = distributedNoise(nx, ny, 0.0f, 8); // Increased octaves for more detail
+        float moisture = distributedNoise(nx + 100.0f, ny + 100.0f, 1.0f, 6);
+        float variation = distributedNoise(nx + 200.0f, ny + 200.0f, 2.0f, 4);
         
-        // Use fixed distribution thresholds to force variety
-        int terrainType;
+        // Use modulo approach to ensure all terrain types appear
+        // Create a hash value from the noise values to get distribution across all terrain types
+        float hash = (elevation * 13.0f + moisture * 17.0f + variation * 19.0f) * 100.0f;
+        int hashInt = (int)hash;
         
-        // Underwater (25% of the map)
-        if (elevation < 0.25f) {
-            if (elevation < 0.1f) {
-                terrainType = WATER;      // Deep water (10%)
+        // Use abs() to handle negative values and modulo to ensure we get all terrain types
+        int terrainType = abs(hashInt % 31); // 31 is the total number of terrain types
+        
+        // Add some clustering to make the terrain less random/noisy
+        // Higher elevation areas tend to be peaks/mountains
+        if (elevation > 0.85f) {
+            // High elevation areas
+            if (hashInt % 4 == 0) {
+                terrainType = MOUNTAIN;
+            } else if (hashInt % 4 == 1) {
+                terrainType = SNOW;
+            } else if (hashInt % 4 == 2) {
+                terrainType = GLACIER;
             } else {
-                terrainType = BAY;        // Shallow water (15%)
+                terrainType = CLIFF;
             }
         }
-        // Coastal (10% of the map)
-        else if (elevation < 0.35f) {
-            if (moisture < 0.5f) {
-                terrainType = BEACH;      // Sandy beach (5%)
+        // Water areas for lower elevation
+        else if (elevation < 0.15f) {
+            // Low elevation areas
+            if (hashInt % 4 == 0) {
+                terrainType = WATER;
+            } else if (hashInt % 4 == 1) {
+                terrainType = BAY;
+            } else if (hashInt % 4 == 2) {
+                terrainType = FJORD;
             } else {
-                terrainType = SAND;       // Regular sand (5%)
+                terrainType = COVE;
             }
         }
-        // Low lands (25% of the map)
-        else if (elevation < 0.60f) {
-            if (moisture < 0.33f) {
-                terrainType = DESERT;     // Dry lowlands (8%)
-            } else if (moisture < 0.66f) {
-                terrainType = GRASS;      // Medium lowlands (8%)
+        // Desert areas for dry regions
+        else if (elevation < 0.4f && moisture < 0.3f) {
+            if (hashInt % 3 == 0) {
+                terrainType = DESERT;
+            } else if (hashInt % 3 == 1) {
+                terrainType = SAND;
             } else {
-                terrainType = SWAMP;      // Wet lowlands (9%)
+                terrainType = DUNE;
             }
         }
-        // Midlands (20% of the map)
-        else if (elevation < 0.80f) {
-            if (moisture < 0.33f) {
-                terrainType = SAVANNA;    // Dry midlands (7%)
-            } else if (moisture < 0.66f) {
-                terrainType = FOREST;     // Medium midlands (7%)
-            } else {
-                terrainType = JUNGLE;     // Wet midlands (6%)
-            }
-        }
-        // Highlands (15% of the map)
-        else if (elevation < 0.95f) {
-            if (moisture < 0.5f) {
-                terrainType = ROCK;       // Dry highlands (7%)
-            } else {
-                terrainType = MOUNTAIN;   // Wet highlands (8%)
-            }
-        }
-        // Peaks (5% of the map)
-        else {
-            terrainType = SNOW;           // Mountain peaks (5%)
-        }
+        // For areas that don't match specific conditions, use the modulo approach
         
         // Store terrain type
         terrain[y * width + x] = terrainType;
     }
 }
 
-// Apply a histogram flattening to the noise values to ensure distribution
-__global__ void histogramFlatten(float* noiseValues, int width, int height) {
-    // This would be a complex implementation requiring atomics and sorting
-    // For simplicity, we'll use the enhancedNoise and distribution thresholds above
-}
-
 void createPerlinNoiseTerrain(int* d_terrain, int width, int height, 
                              float scale, float offsetX, float offsetY) {
-    // Normalize scale to a reasonable range
-    float adjustedScale = fmaxf(0.1f, fminf(fabs(scale), 100.0f));
+    // Normalize scale to a reasonable range - decreased min scale for larger features in big maps
+    float adjustedScale = fmaxf(0.05f, fminf(fabs(scale), 100.0f));
     
+    // Use smaller block size for better occupancy with large maps
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
     
