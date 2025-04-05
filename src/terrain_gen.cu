@@ -146,14 +146,23 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
         float regionFreq = 7.0f + noise(nx * 0.1f, ny * 0.1f, 0.0f) * 3.0f;
         int regionType = (int)(biomeSelector * regionFreq) % 6;
 
-        const float waterChance = 0.15f;
-        const int maxWaterRerolls = 5;
-        for (int i = 0; i < maxWaterRerolls; ++i) {
-            if (regionType != 5) break; // Not water — stop checking
-            float randVal = 0.5f + 0.5f * noise(nx * 83.1f + i * 17.31f, ny * 47.2f + i * 9.13f, 1.23f);
-            if (randVal < waterChance) break;
-            regionType = (int)(biomeSelector * regionFreq) % 6;
-        }        
+        // const float waterChance = 0.0005f;
+        // const int maxWaterRerolls = 100;
+        // for (int i = 0; i < maxWaterRerolls; ++i) {
+        //     if (regionType != 5) break; // Not water — stop checking
+        //     float randVal = 0.5f + 0.5f * noise(nx * 83.1f + i * 17.31f, ny * 47.2f + i * 9.13f, 1.23f);
+        //     if (randVal < waterChance) break;
+        //     regionType = (int)(biomeSelector * regionFreq) % 6;
+        // }        
+        const float waterChance = 0.55f;
+
+        if (regionType == 5) {  // biome 5 = water
+            float chance = 0.5f + 0.5f * noise(nx * 123.45f, ny * 543.21f, 7.89f);
+            if (chance >= waterChance) {
+                // Replace with non-water biome (0–4 only)
+                regionType = (regionType + 1 + (int)(chance * 5)) % 5;
+            }
+        }
         
 
         int terrainType;
@@ -193,7 +202,7 @@ __global__ void generateTerrain(int* terrain, int width, int height, float scale
             case 4: // Grassland regions
                 if (localVar < 0.25f) terrainType = GRASS;
                 else if (localVar < 0.5f) terrainType = PRAIRIE;
-                else if (localVar < 0.75f) terrainType = STEPPE;
+                else if (localVar < 0.6f) terrainType = STEPPE;
                 else terrainType = SAVANNA;
                 break;
                 
@@ -336,9 +345,12 @@ __global__ void cleanupSmallPatches(int* terrain, int* output, int width, int he
         int totalCount = 0;
         int neighborTypes[31] = {0}; // to track the most common neighbor type
         
+        const int filterSize = 500;
+        const int halfFilterSize = filterSize / 2;
+
         // Use a larger neighborhood to better determine if this is an isolated patch
-        for (int dy = -2; dy <= 2; dy++) {
-            for (int dx = -2; dx <= 2; dx++) {
+        for (int dy = -halfFilterSize; dy <= halfFilterSize; dy++) {
+            for (int dx = -halfFilterSize; dx <= halfFilterSize; dx++) {
                 // Skip the center point
                 if (dx == 0 && dy == 0) continue;
                 
@@ -364,7 +376,7 @@ __global__ void cleanupSmallPatches(int* terrain, int* output, int width, int he
         // If less than minRegionSize% of neighbors are the same type, 
         // this is likely an isolated patch or noise
         float sameRatio = (float)sameTypeCount / totalCount;
-        
+        // if (sameRatio < 0.65f) { // looks too smooth @!!!!!!!!!!
         if (sameRatio < (float)minRegionSize / 100.0f) {
             // Find the most common neighboring type to replace with
             int bestType = currentType;
@@ -668,42 +680,40 @@ __global__ void removeSmallComponents(int* terrain, int* labels, int* output, in
 
 void createPerlinNoiseTerrain(int* d_terrain, int width, int height,
     float scale, float offsetX, float offsetY) {
-    // Normalize scale
-    float adjustedScale = fmaxf(0.05f, fminf(fabs(scale), 100.0f));
     
-    // Block and grid sizes
+    float adjustedScale = fmaxf(0.05f, fminf(fabs(scale), 100.0f));
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
 
-    // Generate initial terrain
     generateTerrain<<<gridSize, blockSize>>>(d_terrain, width, height, adjustedScale, offsetX, offsetY);
 
-    // Allocate temporary buffers
     int* d_tempTerrain;
     cudaMalloc(&d_tempTerrain, width * height * sizeof(int));
-    
-    // First, remove isolated noise (single pixels or very small clusters)
+
+    // Step 1: Remove isolated noise
     for (int i = 0; i < 5; i++) {
         removeIsolatedNoise<<<gridSize, blockSize>>>(d_terrain, d_tempTerrain, width, height);
         cudaMemcpy(d_terrain, d_tempTerrain, width * height * sizeof(int), cudaMemcpyDeviceToDevice);
     }
-    
-    // Apply a light smoothing with a small radius
+
+    // Step 2: Initial smoothing
     improvedSmoothTerrain<<<gridSize, blockSize>>>(d_terrain, d_tempTerrain, width, height);
     cudaMemcpy(d_terrain, d_tempTerrain, width * height * sizeof(int), cudaMemcpyDeviceToDevice);
-    
-    // Remove vertical striping artifacts
+
+    // Step 3: Remove vertical striping
     removeVerticalStripes<<<gridSize, blockSize>>>(d_terrain, d_tempTerrain, width, height);
     cudaMemcpy(d_terrain, d_tempTerrain, width * height * sizeof(int), cudaMemcpyDeviceToDevice);
-    
-    // Use a more aggressive cleanup but with a smaller threshold
+
+    // Step 4: Remove small patches
     cleanupSmallPatches<<<gridSize, blockSize>>>(d_terrain, d_tempTerrain, width, height, 20);
     cudaMemcpy(d_terrain, d_tempTerrain, width * height * sizeof(int), cudaMemcpyDeviceToDevice);
-    
-    // Final light smoothing
-    smoothTerrain<<<gridSize, blockSize>>>(d_terrain, d_tempTerrain, width, height);
-    cudaMemcpy(d_terrain, d_tempTerrain, width * height * sizeof(int), cudaMemcpyDeviceToDevice);
 
-    // Clean up
+    // Step 5: Final multi-pass smoothing
+    const int smoothingPasses = 3;
+    for (int i = 0; i < smoothingPasses; i++) {
+        smoothTerrain<<<gridSize, blockSize>>>(d_terrain, d_tempTerrain, width, height);
+        cudaMemcpy(d_terrain, d_tempTerrain, width * height * sizeof(int), cudaMemcpyDeviceToDevice);
+    }
+
     cudaFree(d_tempTerrain);
 }
