@@ -3,10 +3,10 @@
 #include <time.h>
 #include <cuda_runtime.h>
 
-#include "../include/terrain_types.h"
-#include "../include/perlin_noise.h"
-#include "../include/terrain_gen.h"
-#include "../include/visualization.h"
+#include "../include/terrain/terrain_types.h"
+#include "../include/noise/perlin_noise.h"
+#include "../include/terrain/terrain_generator.h"
+#include "../include/visualization/visualization.h"
 
 int main(int argc, char** argv) {
     // Parse command line arguments for scale and size
@@ -42,8 +42,7 @@ int main(int argc, char** argv) {
     // Generate a random seed then split it to X and Y offsets
     int seed = time(NULL); // Random seed based on current time
     srand(seed);
-    // seed = 123; // Uncomment for reproducibility
-
+    
     float randomOffsetX = (seed % 100) * 1.27f;
     float randomOffsetY = (seed % 100) * 2.53f; 
 
@@ -78,12 +77,6 @@ int main(int argc, char** argv) {
         // Handle error appropriately
     }
 
-    // Connecting the landmasses
-    // connectLandmasses(d_terrain, width, height);
-    cudaError_t error2 = cudaGetLastError();
-    if (error2 != cudaSuccess) {
-        printf("CUDA error: %s\n", cudaGetErrorString(error2));
-    }
     // Visualize terrain
     dim3 blockSize(16, 16);
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
