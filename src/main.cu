@@ -9,9 +9,9 @@
 #include "../include/visualization/visualization.h"
 
 int main(int argc, char** argv) {
-    // Parse command line arguments for scale and size
-    float scale = 1.0f;  // Default value
-    int size = 4096;   // Default size
+    TerrainTypes::initializeTerrainTypes();
+    float scale = 1.0f;  // Default value arg1
+    int size = 4096;   // Default size arg2
     
     if (argc > 1) {
         // Try to parse the first argument as the scale

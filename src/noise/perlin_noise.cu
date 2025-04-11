@@ -1,4 +1,4 @@
-#include "../include/perlin_noise.h"
+#include "../../include/noise/perlin_noise.h"
 #include <math.h>
 
 // Define permutation table

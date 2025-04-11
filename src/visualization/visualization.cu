@@ -1,5 +1,5 @@
-#include "../include/visualization.h"
-#include "../include/terrain_types.h"
+#include "../../include/visualization/visualization.h"
+#include "../../include/terrain/terrain_types.h"
 #include <stdio.h>
 
 __global__ void visualizeTerrain(int* terrain, unsigned char* image, int width, int height) {

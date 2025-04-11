@@ -1,7 +1,5 @@
-#include "../include/terrain_types.h"
+#include "../../include/terrain/terrain_types.h"
 
-// Define the constant array once
-__constant__ TerrainType TerrainTypes::TERRAINS[31];
 
 // Host-side array for initialization
 static const TerrainType terrainData[31] = {
@@ -37,6 +35,7 @@ static const TerrainType terrainData[31] = {
     {29, "Cliff",    {112, 128, 144}, false}, 
     {30, "Dune",     {194, 178, 128}, true}  
 };
+__constant__ TerrainType TerrainTypes::TERRAINS[31];
 
 // Function to initialize the constant memory
 void TerrainTypes::initializeTerrainTypes() {

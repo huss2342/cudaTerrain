@@ -16,10 +16,15 @@ if exist bin\main.exp del /f bin\main.exp
 echo [3/5] Compiling CUDA files with relocatable device code enabled...
 nvcc -rdc=true -G ^
 src/main.cu ^
-src/terrain_types.cu ^
-src/terrain_gen.cu ^
-src/perlin_noise.cu ^
-src/visualization.cu -o bin/main
+src/terrain/terrain_types.cu ^
+src/terrain/terrain_generator.cu ^
+src/terrain/terrain_smoothing.cu ^
+src/terrain/component_analysis.cu ^
+src/noise/perlin_noise.cu ^
+src/noise/voronoi_noise.cu ^
+src/noise/noise_utils.cu ^
+src/visualization/visualization.cu ^
+-o bin/main
 
 
 :: Check if compilation succeeded
