@@ -1,15 +1,39 @@
-[] Phase 1: Implement basic 2D terrain generation with a single algorithm (start with Perlin noise maybe)
-[] Phase 2: Add multiple terrain types and coloring
-[] Phase 3: Implement walkability layer
-[] Phase  3.5: Think about whether I need to generate chunks of the maps as the player moves or all at once?
-    is there a performance benefit?
-[] Phase 4: Add more complex algorithms (cellular automata for caves, Voronoi for biomes)?
-[] Phase 5: Add height values (z dimension) to create a 2.5D representation 
-                (with paths to reach height or have some blocked off )
-[] Phase 6: Implement a randomly placed landmark (flags..) on the map
-[] Phase 7: Implement more advanced features (rivers, roads...)
+[X] Phase 1: Implement basic 2D terrain generation with a single algorithm (start with Perlin noise maybe)
+[X] Phase 2: Add multiple terrain types and coloring
+[X] Phase 4: Add more complex algorithms (Voronoi for biomes)
 
-[] Phase Extra.0: Implement a randomly placed landmark (flags, fountains..) on the map
-[] Phase Extra.1:: Implement more advanced features (rivers, roads...)
-[] Phase Extra.2: Implement a simple player movement system
-[] Phase Extra.3: Implement a simple pathfinding algorithm (A* maybe) to determine a path from the player to the landmark
+// Current focus
+[] Phase 5: Add height values (z dimension) to create a 2.5D representation
+    - 5.1: Implement heightmap generation using existing noise functions
+    - 5.2: Update visualization to represent height (through shading or color variation)
+    - 5.3: Add erosion simulation for more realistic terrain features
+
+[] Phase 6: Implement landmark generation
+    - 6.1: Create algorithm to identify suitable landmark locations (flat areas, mountain tops, etc.)
+    - 6.2: Guarantee at least one landmark of each type per map
+    - 6.3: Add visual representation of landmarks in the terrain visualization
+    - 6.4: Implement different landmark types (obelisks, flags, fountains, ruins)
+
+[] Phase 7: Implement water features
+    - 7.1: Create river generation algorithm following terrain height
+    - 7.2: Add lakes at appropriate low points
+    - 7.3: Ensure water features connect properly with existing water biomes
+
+// Later phases
+[] Phase 8: Implement chunked terrain generation
+    - 8.1: Create chunk management system 
+    - 8.2: Modify generators to work with offset coordinates
+    - 8.3: Benchmark performance against full-map generation
+    - 8.4: Implement seamless chunk boundaries
+
+// might do? maybe not?
+[] Phase 9: Add player and pathfinding
+    - 9.1: Implement simple player representation
+    - 9.2: Create A* pathfinding that accounts for terrain type and height
+    - 9.3: Generate optimal paths between landmarks and player
+
+[] Phase 10: Add advanced features and polish
+    - 10.1: Create road network connecting landmarks
+    - 10.2: Add procedural settlements near landmarks
+    - 10.3: Implement day/night visualization
+    - 10.4: Add animated elements (flowing water, waving flags)
