@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     // Check for size parameter
     if (argc > 2) {
         int inputSize = atoi(argv[2]);
-        if (inputSize > 0 && inputSize <= 32000) { // Limit max size to prevent excessive memory usage
+        if (inputSize > 0 && inputSize <= 22000) { // Limit max size to prevent excessive memory usage
             size = inputSize;
             printf("Using provided size: %d x %d\n", size, size);
         } else {
