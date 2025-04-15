@@ -24,6 +24,7 @@ src/noise/perlin_noise.cu ^
 src/noise/voronoi_noise.cu ^
 src/noise/noise_utils.cu ^
 src/visualization/visualization.cu ^
+src/terrain/terrain_height.cu ^
 -o bin/main
 
 

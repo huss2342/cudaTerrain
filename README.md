@@ -45,6 +45,38 @@ main.exe <scale> <map_size>
 
 Example: `main.exe 2.5 1024` creates a 1024×1024 map with smaller features.
 
+## Algorithms & CUDA Kernels
+
+### Noise Generation
+- **Perlin Noise**: Multi-octave gradient noise for smooth terrain elevation
+  - `__device__ float noise(float x, float y, float z)`: GPU device function for basic Perlin noise
+  - `__device__ float enhancedNoise(float x, float y, float z)`: GPU device function for improved distribution
+  - `__device__ float distributedNoise(float x, float y, float z, int octaves)`: GPU device function for multi-octave fractal noise
+
+- **Voronoi Noise**: Cell-based noise for biome separation
+  - `__device__ float voronoiNoise(float x, float y, int seed)`: GPU device function for distance-based cell noise
+
+### Terrain Generation
+- **Primary Generation**:
+  - `generateTerrain<<<gridSize, blockSize>>>(terrain, width, height, scale, offsetX, offsetY)`: CUDA kernel for terrain type generation using combined noise algorithms
+  - `void createPerlinNoiseTerrain(int* d_terrain, int width, height, scale, offsetX, offsetY)`: Host function orchestrating the terrain creation pipeline
+
+### Terrain Processing & Refinement
+- **Smoothing Operations**:
+  - `smoothTerrain<<<gridSize, blockSize>>>(terrain, output, width, height)`: CUDA kernel for basic terrain smoothing
+  - `improvedSmoothTerrain<<<gridSize, blockSize>>>(terrain, output, width, height)`: CUDA kernel for enhanced smoothing with wider radius
+  - `removeVerticalStripes<<<gridSize, blockSize>>>(terrain, output, width, height)`: CUDA kernel that eliminates artifacts from noise patterns
+  - `removeIsolatedNoise<<<gridSize, blockSize>>>(terrain, output, width, height)`: CUDA kernel that removes single-pixel noise
+  - `cleanupSmallPatches<<<gridSize, blockSize>>>(terrain, output, width, height, minRegionSize)`: CUDA kernel that merges small regions
+
+- **Component Analysis**:
+  - `identifyConnectedComponents<<<gridSize, blockSize>>>(terrain, labels, width, height)`: CUDA kernel that labels connected regions
+  - `propagateLabels<<<gridSize, blockSize>>>(terrain, labels, width, height, changed)`: CUDA kernel that merges component labels
+  - `removeSmallComponents<<<gridSize, blockSize>>>(terrain, labels, output, componentSizes, minSize, width, height)`: CUDA kernel that eliminates small components
+
+### Visualization
+- `visualizeTerrain<<<gridSize, blockSize>>>(terrain, image, width, height)`: CUDA kernel that converts terrain data to RGB image
+
 ## Project Structure
 
 - `include/`: Header files organized by feature
