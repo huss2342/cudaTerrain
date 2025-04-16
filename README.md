@@ -85,16 +85,17 @@ Example: `main.exe 2.5 1024` creates a 1024×1024 map with smaller features.
 
 ## Development Phases
 
-[X] Phase 1: Basic 2D terrain with Perlin noise
-[X] Phase 2: Multiple terrain types and coloring
-[X] Phase 4: Add complex algorithms (Voronoi for biomes)
+🟩 Phase 1: Basic 2D terrain with Perlin noise<br>
+🟩 Phase 2: Multiple terrain types and coloring<br>
+🟩 Phase 4: Add complex algorithms (Voronoi for biomes)<br>
 
-[ ] Phase 5: Add height dimension (2.5D)
-[ ] Phase 6: Implement landmarks
-[ ] Phase 7: Add water features (rivers, lakes)
-[ ] Phase 8: Implement chunked generation
-[ ] Phase 9: Add player and pathfinding
-[ ] Phase 10: Advanced features and polish
+🟥 Phase 5: Add height dimension (2.5D)<br>
+🟥 Phase 6: Implement landmarks<br>
+🟥 Phase 7: Add water features (rivers, lakes)<br>
+🟥 Phase 8: Implement chunked generation<br>
+🟥 Phase 9: Add player and pathfinding<br>
+🟥 Phase 10: Advanced features and polish
+
 
 ## Contributors
 
