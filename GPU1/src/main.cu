@@ -10,6 +10,13 @@
 #include "../include/terrain/terrain_height.h" // Add this new include
 
 int main(int argc, char** argv) {
+    // Add timing variables at the beginning
+    clock_t start_time, end_time;
+    double cpu_time_used;
+    
+    // Start the timer
+    start_time = clock();
+    
     TerrainTypes::initializeTerrainTypes();
     float scale = 1.0f;  // Default value arg1
     int size = 4096;     // Default size arg2
@@ -156,6 +163,11 @@ int main(int argc, char** argv) {
     cudaFree(d_image);
     if (d_heightMap) cudaFree(d_heightMap);
     if (d_tempHeightMap) cudaFree(d_tempHeightMap);
+    
+    // Calculate and print execution time
+    end_time = clock();
+    cpu_time_used = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
+    printf("Total execution time: %.2f seconds\n", cpu_time_used);
     
     return 0;
 }
