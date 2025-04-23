@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <cuda_runtime.h>
+#include <string.h>
 
 #include "../include/terrain/terrain_types.h"
 #include "../include/noise/perlin_noise.h"
 #include "../include/terrain/terrain_generator.h"
 #include "../include/visualization/visualization.h"
-#include "../include/terrain/terrain_height.h" // Add this new include
+#include "../include/terrain/terrain_height.h"
 
 int main(int argc, char** argv) {
     // Add timing variables at the beginning
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     start_time = clock();
     
     TerrainTypes::initializeTerrainTypes();
-    float scale = 80.0f;  // Default value arg1
+    float scale = 80.0f;  // Default value arg1 - set to 80.0f to match GPU version
     int size = 4096;     // Default size arg2
     bool useHeight = true; // Default to using height visualization
     
@@ -56,9 +56,8 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Generate a random seed then split it to X and Y offsets
-    int seed = time(NULL); // Random seed based on current time
-    seed = 1234567;
+    // Set a specific seed for reproducibility with the GPU version
+    int seed = 1234567; // Fixed seed to match GPU version
     srand(seed);
     
     float randomOffsetX = (seed % 100) * 1.27f;
@@ -78,77 +77,48 @@ int main(int argc, char** argv) {
     int floatMemSize = width * height * sizeof(float); // For height map
     
     // Allocate host memory
-    int* h_terrain = (int*)malloc(memSize);
-    unsigned char* h_image = (unsigned char*)malloc(imageSize);
-    float* h_heightMap = NULL;
+    int* terrain = new int[width * height];
+    unsigned char* image = new unsigned char[width * height * 3];
+    float* heightMap = nullptr;
+    float* tempHeightMap = nullptr;
     
     if (useHeight) {
-        h_heightMap = (float*)malloc(floatMemSize);
-    }
-    
-    // Allocate device memory
-    int* d_terrain;
-    unsigned char* d_image;
-    float* d_heightMap = NULL;
-    float* d_tempHeightMap = NULL;
-    
-    cudaMalloc(&d_terrain, memSize);
-    cudaMalloc(&d_image, imageSize);
-    
-    if (useHeight) {
-        cudaMalloc(&d_heightMap, floatMemSize);
-        cudaMalloc(&d_tempHeightMap, floatMemSize);
+        heightMap = new float[width * height];
+        tempHeightMap = new float[width * height];
     }
     
     // Generate terrain
-    createPerlinNoiseTerrain(d_terrain, width, height, scale, randomOffsetX, randomOffsetY);
-   
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) {
-        printf("CUDA error: %s\n", cudaGetErrorString(error));
-        // Handle error appropriately
-    }
-
-    // Set up CUDA execution configuration
-    dim3 blockSize(16, 16);
-    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+    createPerlinNoiseTerrain(terrain, width, height, scale, randomOffsetX, randomOffsetY);
     
     if (useHeight) {
         // Generate height map based on terrain types
         printf("Generating height map...\n");
-        generateHeightMap<<<gridSize, blockSize>>>(d_terrain, d_heightMap, width, height, scale, randomOffsetX, randomOffsetY);
+        generateHeightMap(terrain, heightMap, width, height, scale, randomOffsetX, randomOffsetY);
         
         // Apply erosion simulation (multiple passes)
         printf("Simulating erosion...\n");
         const int erosionIterations = 5;
         const float erosionRate = 0.1f;
         for (int i = 0; i < erosionIterations; i++) {
-            simulateErosion<<<gridSize, blockSize>>>(d_heightMap, d_tempHeightMap, width, height, 1, erosionRate);
-            cudaMemcpy(d_heightMap, d_tempHeightMap, floatMemSize, cudaMemcpyDeviceToDevice);
+            simulateErosion(heightMap, tempHeightMap, width, height, 1, erosionRate);
+            memcpy(heightMap, tempHeightMap, floatMemSize);
         }
         
         // Visualize terrain with height information
         printf("Visualizing terrain with height information...\n");
-        visualizeTerrainWithHeight<<<gridSize, blockSize>>>(d_terrain, d_heightMap, d_image, width, height);
-        
-        // Copy height map back to host (if you need it for additional processing)
-        cudaMemcpy(h_heightMap, d_heightMap, floatMemSize, cudaMemcpyDeviceToHost);
+        visualizeTerrainWithHeight(terrain, heightMap, image, width, height);
     } else {
         // Use the original visualization without height
         printf("Visualizing terrain without height information...\n");
-        visualizeTerrain<<<gridSize, blockSize>>>(d_terrain, d_image, width, height);
+        visualizeTerrain(terrain, image, width, height);
     }
-    
-    // Copy terrain and image results back to host
-    cudaMemcpy(h_terrain, d_terrain, memSize, cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_image, d_image, imageSize, cudaMemcpyDeviceToHost);
     
     // Create output filename with scale and size information
     char filename[100];
     sprintf(filename, "terrain_scale%.1f_size%d%s.ppm", scale, size, useHeight ? "_height" : "");
     
     // Save image to file
-    saveToPPM(filename, h_image, width, height);
+    saveToPPM(filename, image, width, height);
     
     // Print a message about the improvements with corrected scale explanation
     printf("Generated multi-scale terrain with enhanced detail.\n");
@@ -156,14 +126,10 @@ int main(int argc, char** argv) {
     printf("Saved terrain to %s\n", filename);
     
     // Clean up
-    free(h_terrain);
-    free(h_image);
-    if (h_heightMap) free(h_heightMap);
-    
-    cudaFree(d_terrain);
-    cudaFree(d_image);
-    if (d_heightMap) cudaFree(d_heightMap);
-    if (d_tempHeightMap) cudaFree(d_tempHeightMap);
+    delete[] terrain;
+    delete[] image;
+    if (heightMap) delete[] heightMap;
+    if (tempHeightMap) delete[] tempHeightMap;
     
     // Calculate and print execution time
     end_time = clock();

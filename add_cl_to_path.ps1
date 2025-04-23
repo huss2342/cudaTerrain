@@ -1,3 +1,4 @@
+# helpful script to help find cl.exe and add it to the PATH (was having issues with nvcc not finding cl.exe)
 # This script will find the Visual Studio cl.exe compiler and add it to your PATH
 # Must be run as Administrator
 
