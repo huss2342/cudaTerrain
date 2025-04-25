@@ -1,6 +1,9 @@
 #ifndef TERRAIN_HEIGHT_H
 #define TERRAIN_HEIGHT_H
 
+#include <thread>
+#include <vector>
+
 // Height generation and manipulation functions
 void generateHeightMap(int* terrain, float* heightMap, int width, int height, 
                       float scale, float offsetX, float offsetY);

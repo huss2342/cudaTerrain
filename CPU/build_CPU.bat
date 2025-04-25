@@ -16,6 +16,7 @@ g++ -std=c++11 -g -O0 ^
 src/main.cpp ^
 src/terrain/terrain_types.cpp ^
 src/terrain/terrain_generator.cpp ^
+src/terrain/terrain_height.cpp ^
 src/visualization/visualization.cpp ^
 src/noise/perlin_noise.cpp ^
 src/noise/voronoi_noise.cpp ^
@@ -35,9 +36,9 @@ echo [4/5] Compilation successful!
 echo [5/5] Running minimal program...
 cd bin
 
-:: Run with very small size (16x16)
-echo Running with minimal size (16x16)...
-minimal.exe 16
+:: Run with 2x2 size for initial testing
+echo Running with minimal size (2x2)...
+minimal.exe 16 2
 
 IF %ERRORLEVEL% NEQ 0 (
     echo.

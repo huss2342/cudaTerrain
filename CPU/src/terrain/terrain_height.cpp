@@ -7,60 +7,49 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include <iostream>
 
-// Assign base height values to terrain types
+// Helper function to get base height for terrain types
 float getTerrainBaseHeight(int terrainType) {
-    switch(terrainType) {
-        // Water bodies - lowest
-        case WATER:
-        case BAY:
-        case FJORD:
-        case COVE:
-            return 0.0f;
-            
-        // Beach & coastal
-        case BEACH:
-        case SAND:
-            return 0.05f;
-            
-        // Plains
-        case GRASS:
-        case PRAIRIE:
-        case SAVANNA:
-        case STEPPE:
-            return 0.3f;
-            
-        // Forest & jungle
-        case FOREST:
-        case JUNGLE:
-        case TAIGA:
-            return 0.4f;
-            
-        // Hills & plateaus
-        case PLATEAU:
-            return 0.6f;
-            
-        // Mountains
-        case MOUNTAIN:
-        case ROCK:
-        case CLIFF:
-            return 0.85f;
-            
-        // Peaks
-        case SNOW:
-        case GLACIER:
-            return 1.0f;
-            
-        // Default for other terrains
-        default:
-            return 0.5f;
+    switch (terrainType) {
+        case 0:  return 0.0f;    // WATER
+        case 1:  return 0.1f;    // SAND
+        case 2:  return 0.3f;    // GRASS
+        case 3:  return 0.5f;    // ROCK
+        case 4:  return 0.7f;    // SNOW
+        case 5:  return 0.1f;    // LAVA
+        case 6:  return 0.2f;    // ICE
+        case 7:  return 0.15f;   // MUD
+        case 8:  return 0.4f;    // FOREST
+        case 9:  return 0.2f;    // DESERT
+        case 10: return 0.8f;    // MOUNTAIN
+        case 11: return 0.1f;    // SWAMP
+        case 12: return 0.45f;   // JUNGLE
+        case 13: return 0.25f;   // TUNDRA
+        case 14: return 0.35f;   // SAVANNA
+        case 15: return 0.4f;    // TAIGA
+        case 16: return 0.3f;    // STEPPE
+        case 17: return 0.25f;   // PRAIRIE
+        case 18: return 0.6f;    // PLATEAU
+        case 19: return 0.7f;    // CANYON
+        case 20: return 0.5f;    // BADLANDS
+        case 21: return 0.55f;   // MESA
+        case 22: return 0.15f;   // OASIS
+        case 23: return 0.9f;    // VOLCANO
+        case 24: return 0.75f;   // GLACIER
+        case 25: return 0.4f;    // FJORD
+        case 26: return 0.05f;   // BAY
+        case 27: return 0.05f;   // COVE
+        case 28: return 0.1f;    // BEACH
+        case 29: return 0.65f;   // CLIFF
+        case 30: return 0.2f;    // DUNE
+        default: return 0.3f;    // Default height
     }
 }
 
 float blendHeight(float baseHeight, float noiseValue) {
-    // Blend the base height (from terrain type) with noise
-    // The 0.7/0.3 ratio gives more weight to the terrain type
-    return baseHeight * 0.7f + noiseValue * 0.3f;
+    // Add variation while preserving the base characteristics
+    return baseHeight + (noiseValue * 0.3f - 0.15f);
 }
 
 // Helper function for multi-threaded height map generation
@@ -90,11 +79,16 @@ void generateHeightMapChunk(int* terrain, float* heightMap, int width, int heigh
 
 void generateHeightMap(int* terrain, float* heightMap, int width, int height,
                       float scale, float offsetX, float offsetY) {
-    // Determine number of threads to use (based on hardware)
-    unsigned int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) numThreads = 4; // Default to 4 if detection fails
+    // Calculate optimal number of threads
+    unsigned int maxThreads = std::thread::hardware_concurrency();
+    if (maxThreads == 0) maxThreads = 4;
     
-    // Create and start threads
+    // Limit threads based on image height
+    unsigned int numThreads = std::min(maxThreads, (unsigned int)(height / 2));
+    numThreads = std::max(1u, numThreads); // Ensure at least 1 thread
+    
+    std::cout << "Height map generation using " << numThreads << " threads" << std::endl;
+    
     std::vector<std::thread> threads;
     int rowsPerThread = height / numThreads;
     
@@ -116,9 +110,8 @@ void generateHeightMap(int* terrain, float* heightMap, int width, int height,
 
 // Helper function for multi-threaded erosion simulation
 void simulateErosionChunk(float* heightMap, float* output, int width, int height,
-                        int iterations, float erosionRate,
-                        int startY, int endY) {
-    // Apply erosion to assigned rows
+                         int iterations, float erosionRate,
+                         int startY, int endY) {
     for (int y = startY; y < endY; y++) {
         for (int x = 0; x < width; x++) {
             int idx = y * width + x;
@@ -161,12 +154,8 @@ void simulateErosionChunk(float* heightMap, float* output, int width, int height
                 float material = currentHeight * erosionRate * maxGradient;
                 output[idx] = currentHeight - material;
                 
-                // Deposit some material at the bottom (atomic add not needed in single-threaded version)
+                // Deposit some material at the bottom
                 int depositIdx = steepestY * width + steepestX;
-                
-                // We'll use a mutex-based approach to handle atomic operations
-                // But for simplicity in this CPU implementation, we'll just add it directly
-                // This should not cause major issues as long as adjacent threads don't access the same cell
                 output[depositIdx] += material * 0.8f; // 20% material lost in transit
             } else {
                 output[idx] = currentHeight;
@@ -176,12 +165,17 @@ void simulateErosionChunk(float* heightMap, float* output, int width, int height
 }
 
 void simulateErosion(float* heightMap, float* output, int width, int height,
-                   int iterations, float erosionRate) {
-    // Determine number of threads to use
-    unsigned int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) numThreads = 4; // Default to 4 if detection fails
+                    int iterations, float erosionRate) {
+    // Calculate optimal number of threads
+    unsigned int maxThreads = std::thread::hardware_concurrency();
+    if (maxThreads == 0) maxThreads = 4;
     
-    // Create and start threads
+    // Limit threads based on image height
+    unsigned int numThreads = std::min(maxThreads, (unsigned int)(height / 2));
+    numThreads = std::max(1u, numThreads); // Ensure at least 1 thread
+    
+    std::cout << "Erosion simulation using " << numThreads << " threads" << std::endl;
+    
     std::vector<std::thread> threads;
     int rowsPerThread = height / numThreads;
     

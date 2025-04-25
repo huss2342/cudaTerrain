@@ -1,7 +1,7 @@
 #ifndef VISUALIZATION_H
 #define VISUALIZATION_H
 
-// Function for terrain visualization
+// Kernel for terrain visualization
 void visualizeTerrain(int* terrain, unsigned char* image, int width, int height);
 
 // Updated function that includes height visualization

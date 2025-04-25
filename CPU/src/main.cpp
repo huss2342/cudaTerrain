@@ -4,86 +4,74 @@
 #include <time.h>
 #include <string.h>
 #include <iostream>
+#include <cstring>
 
 #include "../include/terrain/terrain_types.h"
+#include "../include/noise/perlin_noise.h"
 #include "../include/terrain/terrain_generator.h"
 #include "../include/visualization/visualization.h"
+#include "../include/terrain/terrain_height.h"
 
 int main(int argc, char** argv) {
     try {
-        // Add timing variables at the beginning
-        clock_t start_time, end_time;
-        double cpu_time_used;
+        std::cout << "1. Starting program" << std::endl;
         
-        // Start the timer
-        start_time = clock();
+        // Initialize parameters
+        float scale = 80.0f;
+        int size = 4;
+        bool useHeight = true;
         
-        std::cout << "Initializing terrain types..." << std::endl;
-        TerrainTypes::initializeTerrainTypes();
+        std::cout << "2. Parameters initialized" << std::endl;
         
-        // Use very small dimensions for debugging
-        int width = 16;
-        int height = 16;
-        
-        if (argc > 1) {
-            width = atoi(argv[1]);
-            height = atoi(argv[1]);
-        }
-        
-        std::cout << "Using dimensions: " << width << "x" << height << std::endl;
-        
-        // Set a specific seed for reproducibility
+        // Generate seed and offsets
         int seed = 1234567;
-        srand(seed);
+        float randomOffsetX = (seed % 100) * 1.27f;
+        float randomOffsetY = (seed % 100) * 2.53f;
         
-        std::cout << "Using seed: " << seed << std::endl;
+        std::cout << "3. Seed and offsets generated" << std::endl;
         
         // Allocate memory
-        std::cout << "Allocating memory..." << std::endl;
+        int width = size;
+        int height = size;
         int* terrain = new int[width * height];
-        if (!terrain) {
-            std::cerr << "Failed to allocate terrain memory!" << std::endl;
-            return 1;
-        }
-        
         unsigned char* image = new unsigned char[width * height * 3];
-        if (!image) {
-            std::cerr << "Failed to allocate image memory!" << std::endl;
-            delete[] terrain;
-            return 1;
-        }
         
-        // Generate terrain (simple version)
-        std::cout << "Generating terrain..." << std::endl;
-        generateTerrain(terrain, width, height, 1.0f, 0.0f, 0.0f);
+        std::cout << "4. Memory allocated" << std::endl;
         
-        // Visualize terrain
-        std::cout << "Visualizing terrain..." << std::endl;
+        // Initialize terrain types
+        TerrainTypes::initializeTerrainTypes();
+        
+        std::cout << "5. Terrain types initialized" << std::endl;
+        
+        // Generate terrain
+        createPerlinNoiseTerrain(terrain, width, height, scale, randomOffsetX, randomOffsetY);
+        
+        std::cout << "6. Terrain generated" << std::endl;
+        
+        // Visualize
         visualizeTerrain(terrain, image, width, height);
         
-        // Save the image
-        std::cout << "Saving image..." << std::endl;
-        saveToPPM("minimal_terrain.ppm", image, width, height);
+        std::cout << "7. Visualization complete" << std::endl;
         
-        // Clean up
-        std::cout << "Cleaning up..." << std::endl;
+        // Save
+        saveToPPM("test_terrain.ppm", image, width, height);
+        
+        std::cout << "8. Image saved" << std::endl;
+        
+        // Cleanup
         delete[] terrain;
         delete[] image;
         
-        // Calculate and print execution time
-        end_time = clock();
-        cpu_time_used = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
-        printf("Total execution time: %.2f seconds\n", cpu_time_used);
+        std::cout << "9. Cleanup complete" << std::endl;
         
-        std::cout << "Program completed successfully." << std::endl;
         return 0;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception in main: " << e.what() << std::endl;
+        std::cerr << "Exception: " << e.what() << std::endl;
         return 1;
     }
     catch (...) {
-        std::cerr << "Unknown exception in main!" << std::endl;
+        std::cerr << "Unknown exception!" << std::endl;
         return 1;
     }
 }
