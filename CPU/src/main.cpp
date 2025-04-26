@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <time.h>
-#include <string.h>
+#include <cstring>
 
 #include "../include/terrain/terrain_types.h"
 #include "../include/noise/perlin_noise.h"

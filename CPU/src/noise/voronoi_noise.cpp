@@ -58,8 +58,3 @@ float voronoiNoise(float x, float y, int seed) {
     // Return difference between distances as cell boundary
     return secondMinDist - minDist;
 }
-
-// Convenience overload that uses a default seed
-float voronoiNoise(float x, float y) {
-    return voronoiNoise(x, y, 12345); // Use a default seed value
-}

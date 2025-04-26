@@ -6,6 +6,8 @@
 #include "../../include/noise/noise_utils.h"
 #include <math.h>
 #include <stdio.h>
+#include <cstdlib>
+#include <cstring>
 
 // CPU version of generateTerrain kernel - matches GPU implementation
 void generateTerrain(int* terrain, int width, int height, float scale, float offsetX, float offsetY) {

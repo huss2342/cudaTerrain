@@ -3,7 +3,7 @@
 #include "../../include/noise/perlin_noise.h"
 #include "../../include/noise/noise_utils.h"
 #include <math.h>
-#include <string.h> // For memcpy
+#include <cstring> 
 
 // Helper function to get base height for terrain types - identical to GPU version
 float getTerrainBaseHeight(int terrainType) {

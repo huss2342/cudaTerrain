@@ -76,7 +76,3 @@ float noise(float x, float y, float z) {
                  grad(permutation[BB+1], x-1, y-1, z-1), u), v), w);
 }
 
-// 2D convenience function that calls the main 3D implementation
-float noise(float x, float y) {
-    return noise(x, y, 0.0f);
-}
