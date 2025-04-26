@@ -8,57 +8,64 @@
 #include <thread>
 #include <vector>
 #include <iostream>
+#include <stdexcept>
 
 // Helper function to get base height for terrain types
 float getTerrainBaseHeight(int terrainType) {
     switch (terrainType) {
-        case 0:  return 0.0f;    // WATER
-        case 1:  return 0.1f;    // SAND
-        case 2:  return 0.3f;    // GRASS
-        case 3:  return 0.5f;    // ROCK
-        case 4:  return 0.7f;    // SNOW
-        case 5:  return 0.1f;    // LAVA
-        case 6:  return 0.2f;    // ICE
-        case 7:  return 0.15f;   // MUD
-        case 8:  return 0.4f;    // FOREST
-        case 9:  return 0.2f;    // DESERT
-        case 10: return 0.8f;    // MOUNTAIN
-        case 11: return 0.1f;    // SWAMP
-        case 12: return 0.45f;   // JUNGLE
-        case 13: return 0.25f;   // TUNDRA
-        case 14: return 0.35f;   // SAVANNA
-        case 15: return 0.4f;    // TAIGA
-        case 16: return 0.3f;    // STEPPE
-        case 17: return 0.25f;   // PRAIRIE
-        case 18: return 0.6f;    // PLATEAU
-        case 19: return 0.7f;    // CANYON
-        case 20: return 0.5f;    // BADLANDS
-        case 21: return 0.55f;   // MESA
-        case 22: return 0.15f;   // OASIS
-        case 23: return 0.9f;    // VOLCANO
-        case 24: return 0.75f;   // GLACIER
-        case 25: return 0.4f;    // FJORD
-        case 26: return 0.05f;   // BAY
-        case 27: return 0.05f;   // COVE
-        case 28: return 0.1f;    // BEACH
-        case 29: return 0.65f;   // CLIFF
-        case 30: return 0.2f;    // DUNE
-        default: return 0.3f;    // Default height
+        case WATER:
+        case BAY:
+        case FJORD:
+        case COVE:
+            return 0.0f;
+        case BEACH:
+        case SAND:
+            return 0.05f;
+        case GRASS:
+        case PRAIRIE:
+        case SAVANNA:
+        case STEPPE:
+            return 0.3f;
+        case FOREST:
+        case JUNGLE:
+        case TAIGA:
+            return 0.4f;
+        case PLATEAU:
+            return 0.6f;
+        case MOUNTAIN:
+        case ROCK:
+        case CLIFF:
+            return 0.85f;
+        case SNOW:
+        case GLACIER:
+            return 1.0f;
+        default:
+            return 0.5f;
     }
 }
 
 float blendHeight(float baseHeight, float noiseValue) {
-    // Add variation while preserving the base characteristics
-    return baseHeight + (noiseValue * 0.3f - 0.15f);
+    // Blend the base height with noise using same ratio as GPU
+    return baseHeight * 0.7f + noiseValue * 0.3f;
 }
 
-// Helper function for multi-threaded height map generation
-void generateHeightMapChunk(int* terrain, float* heightMap, int width, int height,
-                          float scale, float offsetX, float offsetY,
-                          int startY, int endY) {
-    for (int y = startY; y < endY; y++) {
+void generateHeightMap(int* terrain, float* heightMap, int width, int height, 
+                      float scale, float offsetX, float offsetY) {
+    if (!terrain || !heightMap) {
+        throw std::runtime_error("Null pointer passed to generateHeightMap");
+    }
+    
+    if (width <= 0 || height <= 0) {
+        throw std::runtime_error("Invalid dimensions in generateHeightMap");
+    }
+    
+    for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            int idx = y * width + x;
+            long long idx = (long long)y * width + x;
+            if (idx >= (long long)width * height) {
+                throw std::runtime_error("Index out of bounds in generateHeightMap");
+            }
+            
             int terrainType = terrain[idx];
             
             // Get base height for this terrain type
@@ -77,120 +84,71 @@ void generateHeightMapChunk(int* terrain, float* heightMap, int width, int heigh
     }
 }
 
-void generateHeightMap(int* terrain, float* heightMap, int width, int height,
-                      float scale, float offsetX, float offsetY) {
-    // Calculate optimal number of threads
-    unsigned int maxThreads = std::thread::hardware_concurrency();
-    if (maxThreads == 0) maxThreads = 4;
-    
-    // Limit threads based on image height
-    unsigned int numThreads = std::min(maxThreads, (unsigned int)(height / 2));
-    numThreads = std::max(1u, numThreads); // Ensure at least 1 thread
-    
-    std::cout << "Height map generation using " << numThreads << " threads" << std::endl;
-    
-    std::vector<std::thread> threads;
-    int rowsPerThread = height / numThreads;
-    
-    for (unsigned int i = 0; i < numThreads; i++) {
-        int startY = i * rowsPerThread;
-        int endY = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-        
-        threads.push_back(std::thread(
-            generateHeightMapChunk, terrain, heightMap, width, height,
-            scale, offsetX, offsetY, startY, endY
-        ));
+void simulateErosion(float* heightMap, float* output, int width, int height,
+                     int iterations, float erosionRate) {
+    if (!heightMap || !output) {
+        throw std::runtime_error("Null pointer passed to simulateErosion");
     }
     
-    // Wait for all threads to complete
-    for (auto& thread : threads) {
-        thread.join();
+    if (width <= 4 || height <= 4) {
+        throw std::runtime_error("Dimensions too small for erosion simulation");
     }
-}
-
-// Helper function for multi-threaded erosion simulation
-void simulateErosionChunk(float* heightMap, float* output, int width, int height,
-                         int iterations, float erosionRate,
-                         int startY, int endY) {
-    for (int y = startY; y < endY; y++) {
-        for (int x = 0; x < width; x++) {
-            int idx = y * width + x;
-            
-            // Skip edges of the map
-            if (x <= 2 || y <= 2 || x >= width-3 || y >= height-3) {
-                output[idx] = heightMap[idx];
-                continue;
-            }
-            
-            float currentHeight = heightMap[idx];
-            
-            // Find steepest downhill direction
-            float maxGradient = 0.0f;
-            int steepestX = x;
-            int steepestY = y;
-            
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dx = -1; dx <= 1; dx++) {
-                    if (dx == 0 && dy == 0) continue;
+    
+    // Copy initial heightmap to output
+    std::copy(heightMap, heightMap + (long long)width * height, output);
+    
+    // Clamp erosion rate to prevent instability
+    float clampedErosionRate = std::min(1.0f, std::max(0.0f, erosionRate));
+    
+    for (int iter = 0; iter < iterations; iter++) {
+        // Use a 2-pixel border to prevent edge issues
+        for (int y = 2; y < height-2; y++) {
+            for (int x = 2; x < width-2; x++) {
+                long long idx = (long long)y * width + x;
+                if (idx >= (long long)width * height) {
+                    throw std::runtime_error("Index out of bounds in simulateErosion");
+                }
+                
+                float currentHeight = output[idx];
+                float maxGradient = 0.0f;
+                int steepestX = x;
+                int steepestY = y;
+                
+                // Find steepest downhill direction
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        if (dx == 0 && dy == 0) continue;
+                        
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        long long nidx = (long long)ny * width + nx;
+                        
+                        if (nidx < 0 || nidx >= (long long)width * height) {
+                            continue;
+                        }
+                        
+                        float neighborHeight = output[nidx];
+                        float gradient = currentHeight - neighborHeight;
+                        
+                        if (gradient > maxGradient) {
+                            maxGradient = gradient;
+                            steepestX = nx;
+                            steepestY = ny;
+                        }
+                    }
+                }
+                
+                // If there's a downhill path, simulate erosion
+                if (maxGradient > 0.01f) {
+                    float material = currentHeight * clampedErosionRate * maxGradient;
+                    output[idx] = currentHeight - material;
                     
-                    int nx = x + dx;
-                    int ny = y + dy;
-                    int nidx = ny * width + nx;
-                    
-                    float neighborHeight = heightMap[nidx];
-                    float gradient = currentHeight - neighborHeight;
-                    
-                    if (gradient > maxGradient) {
-                        maxGradient = gradient;
-                        steepestX = nx;
-                        steepestY = ny;
+                    long long depositIdx = (long long)steepestY * width + steepestX;
+                    if (depositIdx >= 0 && depositIdx < (long long)width * height) {
+                        output[depositIdx] += material * 0.8f;
                     }
                 }
             }
-            
-            // If there's a downhill path, simulate erosion
-            if (maxGradient > 0.01f) {
-                // Move some material downhill
-                float material = currentHeight * erosionRate * maxGradient;
-                output[idx] = currentHeight - material;
-                
-                // Deposit some material at the bottom
-                int depositIdx = steepestY * width + steepestX;
-                output[depositIdx] += material * 0.8f; // 20% material lost in transit
-            } else {
-                output[idx] = currentHeight;
-            }
         }
-    }
-}
-
-void simulateErosion(float* heightMap, float* output, int width, int height,
-                    int iterations, float erosionRate) {
-    // Calculate optimal number of threads
-    unsigned int maxThreads = std::thread::hardware_concurrency();
-    if (maxThreads == 0) maxThreads = 4;
-    
-    // Limit threads based on image height
-    unsigned int numThreads = std::min(maxThreads, (unsigned int)(height / 2));
-    numThreads = std::max(1u, numThreads); // Ensure at least 1 thread
-    
-    std::cout << "Erosion simulation using " << numThreads << " threads" << std::endl;
-    
-    std::vector<std::thread> threads;
-    int rowsPerThread = height / numThreads;
-    
-    for (unsigned int i = 0; i < numThreads; i++) {
-        int startY = i * rowsPerThread;
-        int endY = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-        
-        threads.push_back(std::thread(
-            simulateErosionChunk, heightMap, output, width, height,
-            iterations, erosionRate, startY, endY
-        ));
-    }
-    
-    // Wait for all threads to complete
-    for (auto& thread : threads) {
-        thread.join();
     }
 }

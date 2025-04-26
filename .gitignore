@@ -5,3 +5,5 @@ tempCodeRunnerFile.exp
 tempCodeRunnerFile.lib
 *.ppm
 terrain.ppm
+GPU1/bin
+CPU/bin

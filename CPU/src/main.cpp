@@ -1,10 +1,11 @@
-// CPU/src/main.cpp - minimal version
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
 #include <iostream>
 #include <cstring>
+#include <stdexcept>
+#include <limits>
 
 #include "../include/terrain/terrain_types.h"
 #include "../include/noise/perlin_noise.h"
@@ -14,64 +15,96 @@
 
 int main(int argc, char** argv) {
     try {
-        std::cout << "1. Starting program" << std::endl;
-        
-        // Initialize parameters
+        // Fixed parameters to match GPU version
         float scale = 80.0f;
-        int size = 4;
-        bool useHeight = true;
-        
-        std::cout << "2. Parameters initialized" << std::endl;
-        
-        // Generate seed and offsets
+        int size = 4096;
         int seed = 1234567;
+        
+        // Generate offsets from seed
         float randomOffsetX = (seed % 100) * 1.27f;
         float randomOffsetY = (seed % 100) * 2.53f;
         
-        std::cout << "3. Seed and offsets generated" << std::endl;
+        std::cout << "Generating terrain..." << std::endl;
         
-        // Allocate memory
+        // Calculate array sizes
         int width = size;
         int height = size;
-        int* terrain = new int[width * height];
-        unsigned char* image = new unsigned char[width * height * 3];
+        long long totalSize = (long long)width * height;
+        long long imageSize = totalSize * 3;
         
-        std::cout << "4. Memory allocated" << std::endl;
+        // Check for potential overflow
+        if (totalSize > std::numeric_limits<int>::max()) {
+            throw std::runtime_error("Size too large, would cause integer overflow");
+        }
         
-        // Initialize terrain types
+        std::cout << "Allocating memory..." << std::endl;
+        
+        // Allocate memory with checks
+        int* terrain = nullptr;
+        float* heightMap = nullptr;
+        float* erodedHeightMap = nullptr;
+        unsigned char* image = nullptr;
+        
+        try {
+            terrain = new int[totalSize];
+            heightMap = new float[totalSize];
+            erodedHeightMap = new float[totalSize];
+            image = new unsigned char[imageSize];
+            
+            if (!terrain || !heightMap || !erodedHeightMap || !image) {
+                throw std::bad_alloc();
+            }
+            
+            // Zero out the arrays
+            std::memset(terrain, 0, totalSize * sizeof(int));
+            std::memset(heightMap, 0, totalSize * sizeof(float));
+            std::memset(erodedHeightMap, 0, totalSize * sizeof(float));
+            std::memset(image, 0, imageSize * sizeof(unsigned char));
+        }
+        catch (const std::bad_alloc&) {
+            delete[] terrain;
+            delete[] heightMap;
+            delete[] erodedHeightMap;
+            delete[] image;
+            throw std::runtime_error("Failed to allocate memory");
+        }
+        
+        std::cout << "Initializing terrain types..." << std::endl;
         TerrainTypes::initializeTerrainTypes();
         
-        std::cout << "5. Terrain types initialized" << std::endl;
-        
-        // Generate terrain
+        std::cout << "Generating terrain data..." << std::endl;
         createPerlinNoiseTerrain(terrain, width, height, scale, randomOffsetX, randomOffsetY);
         
-        std::cout << "6. Terrain generated" << std::endl;
+        std::cout << "Generating height map..." << std::endl;
+        generateHeightMap(terrain, heightMap, width, height, scale, randomOffsetX, randomOffsetY);
         
-        // Visualize
-        visualizeTerrain(terrain, image, width, height);
+        std::cout << "Applying erosion..." << std::endl;
+        simulateErosion(heightMap, erodedHeightMap, width, height, 3, 0.15f);
         
-        std::cout << "7. Visualization complete" << std::endl;
+        std::cout << "Visualizing terrain..." << std::endl;
+        visualizeTerrainWithHeight(terrain, erodedHeightMap, image, width, height);
         
         // Save
-        saveToPPM("test_terrain.ppm", image, width, height);
+        std::string filename = "terrain_4096x4096.ppm";
+        saveToPPM(filename.c_str(), image, width, height);
         
-        std::cout << "8. Image saved" << std::endl;
+        std::cout << "Terrain generation complete!" << std::endl;
+        std::cout << "Output saved to: " << filename << std::endl;
         
         // Cleanup
         delete[] terrain;
+        delete[] heightMap;
+        delete[] erodedHeightMap;
         delete[] image;
-        
-        std::cout << "9. Cleanup complete" << std::endl;
         
         return 0;
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
     catch (...) {
-        std::cerr << "Unknown exception!" << std::endl;
+        std::cerr << "Unknown error occurred!" << std::endl;
         return 1;
     }
 }

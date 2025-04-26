@@ -1,54 +1,42 @@
 @echo off
+setlocal enabledelayedexpansion
+
 cd CPU
-echo ========== TerrainCraft CPU Minimal Build Script ==========
 
 :: Create bin directory if it doesn't exist
-echo [1/5] Creating bin directory if it doesn't exist...
 if not exist bin mkdir bin
 
-:: Clean any previous build artifacts
-echo [2/5] Cleaning previous build artifacts...
-if exist bin\minimal.exe del /f bin\minimal.exe
+:: Clean previous build
+del /Q bin\*
 
-:: Compile with g++ - minimal build with debug flags
-echo [3/5] Compiling minimal CPU implementation...
-g++ -std=c++11 -g -O0 ^
-src/main.cpp ^
-src/terrain/terrain_types.cpp ^
-src/terrain/terrain_generator.cpp ^
-src/terrain/terrain_height.cpp ^
-src/visualization/visualization.cpp ^
-src/noise/perlin_noise.cpp ^
-src/noise/voronoi_noise.cpp ^
-src/noise/noise_utils.cpp ^
--o bin/minimal
+:: Compile the CPU implementation
+g++ -o bin/minimal.exe ^
+    src/main.cpp ^
+    src/noise/perlin_noise.cpp ^
+    src/noise/voronoi_noise.cpp ^
+    src/noise/noise_utils.cpp ^
+    src/terrain/terrain_generator.cpp ^
+    src/terrain/terrain_smoothing.cpp ^
+    src/terrain/terrain_types.cpp ^
+    src/terrain/terrain_height.cpp ^
+    src/visualization/visualization.cpp ^
+    -I include ^
+    -O3
 
-:: Check if compilation succeeded
-if %errorlevel% neq 0 (
-    echo.
-    echo [ERROR] Compilation failed with error code %errorlevel%
-    exit /b %errorlevel%
-)
-
-echo [4/5] Compilation successful!
-
-:: Run the program with a very small test size
-echo [5/5] Running minimal program...
-cd bin
-
-:: Run with 2x2 size for initial testing
-echo Running with minimal size (2x2)...
-minimal.exe 16 2
-
-IF %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo [ERROR] Program execution failed with error code %ERRORLEVEL%
-    cd ..
+:: Check if compilation was successful
+if %ERRORLEVEL% NEQ 0 (
+    echo Compilation failed with error code %ERRORLEVEL%
     exit /b %ERRORLEVEL%
 )
 
-echo.
-echo Test run succeeded!
+:: Run the program with scale=80 and size=4096
+bin\minimal.exe 80 4096
+
+:: Check if program execution was successful
+if %ERRORLEVEL% NEQ 0 (
+    echo Program execution failed with error code %ERRORLEVEL%
+    exit /b %ERRORLEVEL%
+)
 
 cd ..
-echo ========== Minimal Build and Run Complete ==========
+endlocal
