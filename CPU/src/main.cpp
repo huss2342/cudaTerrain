@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <iostream>
-#include <cstring>
-#include <stdexcept>
-#include <limits>
 
 #include "../include/terrain/terrain_types.h"
 #include "../include/noise/perlin_noise.h"
@@ -14,97 +10,142 @@
 #include "../include/terrain/terrain_height.h"
 
 int main(int argc, char** argv) {
-    try {
-        // Fixed parameters to match GPU version
-        float scale = 80.0f;
-        int size = 4096;
-        int seed = 1234567;
-        
-        // Generate offsets from seed
-        float randomOffsetX = (seed % 100) * 1.27f;
-        float randomOffsetY = (seed % 100) * 2.53f;
-        
-        std::cout << "Generating terrain..." << std::endl;
-        
-        // Calculate array sizes
-        int width = size;
-        int height = size;
-        long long totalSize = (long long)width * height;
-        long long imageSize = totalSize * 3;
-        
-        // Check for potential overflow
-        if (totalSize > std::numeric_limits<int>::max()) {
-            throw std::runtime_error("Size too large, would cause integer overflow");
+    clock_t start_time, end_time;
+    double cpu_time_used;
+    
+    // Start the timer
+    start_time = clock();
+    
+    TerrainTypes::initializeTerrainTypes();
+    float scale = 80.0f;  // Default value arg1
+    int size = 4096;     // Default size arg2
+    bool useHeight = true; // Default to using height visualization
+    
+    if (argc > 1) {
+        // Try to parse the first argument as the scale
+        float inputScale = atof(argv[1]);
+        if (inputScale > 0.0f) {
+            scale = inputScale;
+            printf("Using provided scale: %f\n", scale);
+        } else {
+            printf("Invalid scale value provided. Using default scale: %f\n", scale);
         }
-        
-        std::cout << "Allocating memory..." << std::endl;
-        
-        // Allocate memory with checks
-        int* terrain = nullptr;
-        float* heightMap = nullptr;
-        float* erodedHeightMap = nullptr;
-        unsigned char* image = nullptr;
-        
-        try {
-            terrain = new int[totalSize];
-            heightMap = new float[totalSize];
-            erodedHeightMap = new float[totalSize];
-            image = new unsigned char[imageSize];
-            
-            if (!terrain || !heightMap || !erodedHeightMap || !image) {
-                throw std::bad_alloc();
-            }
-            
-            // Zero out the arrays
-            std::memset(terrain, 0, totalSize * sizeof(int));
-            std::memset(heightMap, 0, totalSize * sizeof(float));
-            std::memset(erodedHeightMap, 0, totalSize * sizeof(float));
-            std::memset(image, 0, imageSize * sizeof(unsigned char));
+    } else {
+        printf("No scale provided. Using default scale: %f\n", scale);
+    }
+    
+    // Check for size parameter
+    if (argc > 2) {
+        int inputSize = atoi(argv[2]);
+        if (inputSize > 0 && inputSize <= 22000) { // Limit max size to prevent excessive memory usage
+            size = inputSize;
+            printf("Using provided size: %d x %d\n", size, size);
+        } else {
+            printf("Invalid or too large size provided. Using default size: %d x %d\n", size, size);
         }
-        catch (const std::bad_alloc&) {
-            delete[] terrain;
-            delete[] heightMap;
-            delete[] erodedHeightMap;
-            delete[] image;
-            throw std::runtime_error("Failed to allocate memory");
+    } else {
+        printf("No size provided. Using default size: %d x %d\n", size, size);
+    }
+    
+    // Optional parameter to disable height visualization
+    if (argc > 3) {
+        if (strcmp(argv[3], "noheight") == 0) {
+            useHeight = false;
+            printf("Height visualization disabled\n");
         }
-        
-        std::cout << "Initializing terrain types..." << std::endl;
-        TerrainTypes::initializeTerrainTypes();
-        
-        std::cout << "Generating terrain data..." << std::endl;
-        createPerlinNoiseTerrain(terrain, width, height, scale, randomOffsetX, randomOffsetY);
-        
-        std::cout << "Generating height map..." << std::endl;
+    }
+    
+    // Generate a random seed then split it to X and Y offsets
+    int seed = time(NULL); // Random seed based on current time
+    seed = 1234567; // Override with fixed seed to match CPU&GPU version
+    srand(seed);
+    
+    float randomOffsetX = (seed % 100) * 1.27f;
+    float randomOffsetY = (seed % 100) * 2.53f; 
+
+    printf("Generated terrain with seed: %d\n", seed);
+    printf("Offsets: X=%f, Y=%f\n", randomOffsetX, randomOffsetY);
+
+    //TerrainTypes::initializeTerrainTypes();
+
+    // Define terrain size
+    int width = size;
+    int height = size;
+    long long memSize = (long long)width * height * sizeof(int);
+    long long imageSize = (long long)width * height * 3 * sizeof(unsigned char); // RGB
+    long long floatMemSize = (long long)width * height * sizeof(float); // For height map
+    
+    // Allocate host memory
+    int* terrain = (int*)malloc(memSize);
+    unsigned char* image = (unsigned char*)malloc(imageSize);
+    float* heightMap = NULL;
+    float* tempHeightMap = NULL;
+    
+    if (useHeight) {
+        heightMap = (float*)malloc(floatMemSize);
+        tempHeightMap = (float*)malloc(floatMemSize); // Equivalent to d_tempHeightMap
+    }
+    
+    if (!terrain || !image || (useHeight && (!heightMap || !tempHeightMap))) {
+        printf("Failed to allocate memory\n");
+        // Cleanup any allocated memory
+        if (terrain) free(terrain);
+        if (image) free(image);
+        if (heightMap) free(heightMap);
+        if (tempHeightMap) free(tempHeightMap);
+        return 1;
+    }
+    
+    // Generate terrain
+    printf("Generating terrain...\n");
+    createPerlinNoiseTerrain(terrain, width, height, scale, randomOffsetX, randomOffsetY);
+    
+    if (useHeight) {
+        // Generate height map based on terrain types
+        printf("Generating height map...\n");
         generateHeightMap(terrain, heightMap, width, height, scale, randomOffsetX, randomOffsetY);
         
-        std::cout << "Applying erosion..." << std::endl;
-        simulateErosion(heightMap, erodedHeightMap, width, height, 3, 0.15f);
+        // Apply erosion simulation (multiple passes)
+        printf("Simulating erosion...\n");
+        const int erosionIterations = 5;
+        const float erosionRate = 0.1f;
+        for (int i = 0; i < erosionIterations; i++) {
+            simulateErosion(heightMap, tempHeightMap, width, height, 1, erosionRate);
+            // Copy tempHeightMap back to heightMap (equivalent to cudaMemcpy)
+            memcpy(heightMap, tempHeightMap, floatMemSize);
+        }
         
-        std::cout << "Visualizing terrain..." << std::endl;
-        visualizeTerrainWithHeight(terrain, erodedHeightMap, image, width, height);
-        
-        // Save
-        std::string filename = "terrain_4096x4096.ppm";
-        saveToPPM(filename.c_str(), image, width, height);
-        
-        std::cout << "Terrain generation complete!" << std::endl;
-        std::cout << "Output saved to: " << filename << std::endl;
-        
-        // Cleanup
-        delete[] terrain;
-        delete[] heightMap;
-        delete[] erodedHeightMap;
-        delete[] image;
-        
-        return 0;
+        // Visualize terrain with height information
+        printf("Visualizing terrain with height information...\n");
+        visualizeTerrainWithHeight(terrain, heightMap, image, width, height);
+    } else {
+        // Use the original visualization without height
+        printf("Visualizing terrain without height information...\n");
+        visualizeTerrain(terrain, image, width, height);
     }
-    catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
-    catch (...) {
-        std::cerr << "Unknown error occurred!" << std::endl;
-        return 1;
-    }
+    
+    // Create output filename with scale and size information
+    char filename[100];
+    sprintf(filename, "terrain_scale%.1f_size%d%s.ppm", scale, size, useHeight ? "_height" : "");
+    
+    // Save image to file
+    saveToPPM(filename, image, width, height);
+    
+    // Print a message about the improvements with corrected scale explanation
+    printf("Generated multi-scale terrain with enhanced detail.\n");
+    printf("Scale: %.1f - Lower values = zoomed out (larger features), Higher values = zoomed in (smaller features)\n", scale);
+    printf("Saved terrain to %s\n", filename);
+    
+    // Clean up
+    free(terrain);
+    free(image);
+    if (heightMap) free(heightMap);
+    if (tempHeightMap) free(tempHeightMap);
+    
+    // Calculate and print execution time
+    end_time = clock();
+    cpu_time_used = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
+    printf("Total execution time: %.2f seconds\n", cpu_time_used);
+    
+    return 0;
 }

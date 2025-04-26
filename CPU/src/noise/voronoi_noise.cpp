@@ -1,65 +1,65 @@
-// CPU/src/noise/voronoi_noise.cpp - minimal stub implementation
 #include "../../include/noise/voronoi_noise.h"
-#include "../../include/noise/perlin_noise.h"
-#include <cmath>
-#include <limits>
-#include <random>
-#include <stdexcept>
-#include <iostream>
-#include <algorithm>
+#include <math.h>
 
-// Hash function for Voronoi noise
-int hash(int x, int y) {
-    int h = x * 374761393 + y * 668265263;
-    h = (h ^ (h >> 13)) * 1274126177;
-    return h ^ (h >> 16);
+// Simple 2D Voronoi noise implementation matching GPU version
+float voronoiNoise(float x, float y, int seed) {
+    float cellSize = 1.0f;
+    
+    // Normalize coordinates
+    float nx = x / cellSize;
+    float ny = y / cellSize;
+    
+    // Get integer cell coordinates
+    int xi = floorf(nx);
+    int yi = floorf(ny);
+    
+    float minDist = 1000.0f;
+    float secondMinDist = 1000.0f;
+    
+    // Check surrounding cells
+    for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+            int cx = xi + i;
+            int cy = yi + j;
+            
+            // Get random position in cell using improved hash
+            unsigned int h = seed;
+            h = (h * 747796405) + cx;
+            h = (h * 747796405) + cy;
+            h = (h ^ (h >> 12)) * 1664525;
+            h = (h ^ (h >> 19)) * 1013904223;
+            float fx = (h & 0xFFFF) / 65536.0f;
+            
+            h = (h * 747796405) + cx;
+            h = (h * 747796405) + cy;
+            h = (h ^ (h >> 12)) * 1664525;
+            h = (h ^ (h >> 19)) * 1013904223;
+            float fy = (h & 0xFFFF) / 65536.0f;
+            
+            // Feature point position (in normalized space)
+            float px = cx + fx;
+            float py = cy + fy;
+            
+            // Distance to feature point
+            float dx = px - nx;
+            float dy = py - ny;
+            float dist = sqrtf((dx*dx) + (dy*dy));
+            
+            // Update distances
+            if (dist < minDist) {
+                secondMinDist = minDist;
+                minDist = dist;
+            } else if (dist < secondMinDist) {
+                secondMinDist = dist;
+            }
+        }
+    }
+    
+    // Return difference between distances as cell boundary
+    return secondMinDist - minDist;
 }
 
+// Convenience overload that uses a default seed
 float voronoiNoise(float x, float y) {
-    float cellX = floor(x);
-    float cellY = floor(y);
-    float minDist = 1.0f;
-
-    for (int offsetY = -1; offsetY <= 1; offsetY++) {
-        for (int offsetX = -1; offsetX <= 1; offsetX++) {
-            float neighborX = cellX + offsetX;
-            float neighborY = cellY + offsetY;
-            
-            // Generate a random point within the cell
-            float pointX = neighborX + noise(neighborX, neighborY);
-            float pointY = neighborY + noise(neighborY, neighborX);
-            
-            // Calculate distance to the point
-            float dx = pointX - x;
-            float dy = pointY - y;
-            float dist = sqrt(dx * dx + dy * dy);
-            
-            minDist = std::min(minDist, dist);
-        }
-    }
-
-    return minDist;
-}
-
-float hash(int n) {
-    try {
-        // Ensure n is within a reasonable range to prevent overflow
-        n = n & 0x7fffffff;  // Keep only lower 31 bits
-        
-        n = (n << 13) ^ n;
-        n = (n * (n * n * 15731 + 789221) + 1376312589);
-        
-        float result = 1.0f - (static_cast<float>(n & 0x7fffffff) / 1073741824.0f);
-        
-        // Check for numerical issues
-        if (std::isnan(result) || std::isinf(result)) {
-            throw std::runtime_error("Invalid hash calculation");
-        }
-        
-        return result;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Error in hash function: " << e.what() << std::endl;
-        return 0.5f;  // Return middle value on error
-    }
+    return voronoiNoise(x, y, 12345); // Use a default seed value
 }

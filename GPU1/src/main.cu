@@ -7,10 +7,9 @@
 #include "../include/noise/perlin_noise.h"
 #include "../include/terrain/terrain_generator.h"
 #include "../include/visualization/visualization.h"
-#include "../include/terrain/terrain_height.h" // Add this new include
+#include "../include/terrain/terrain_height.h"
 
 int main(int argc, char** argv) {
-    // Add timing variables at the beginning
     clock_t start_time, end_time;
     double cpu_time_used;
     
@@ -58,7 +57,7 @@ int main(int argc, char** argv) {
     
     // Generate a random seed then split it to X and Y offsets
     int seed = time(NULL); // Random seed based on current time
-    seed = 1234567;
+    seed = 1234567; // Override with fixed seed to match CPU&GPU version
     srand(seed);
     
     float randomOffsetX = (seed % 100) * 1.27f;
@@ -67,8 +66,7 @@ int main(int argc, char** argv) {
     printf("Generated terrain with seed: %d\n", seed);
     printf("Offsets: X=%f, Y=%f\n", randomOffsetX, randomOffsetY);
 
-    // Initialize terrain types
-    TerrainTypes::initializeTerrainTypes();
+    //TerrainTypes::initializeTerrainTypes();
 
     // Define terrain size
     int width = size;

@@ -2,6 +2,12 @@
 # This script will find the Visual Studio cl.exe compiler and add it to your PATH
 # Must be run as Administrator
 
+#install choco (in admin powershell)
+# Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# install mingw (in admin powershell)
+# choco install mingw -y
+
 # First let's check if we're running as administrator
 if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "This script needs to be run as Administrator. Right-click the PowerShell icon and select 'Run as Administrator'."

@@ -1,16 +1,20 @@
 @echo off
-setlocal enabledelayedexpansion
-
-cd CPU
+echo ========== TerrainCraft CPU Build Script ==========
 
 :: Create bin directory if it doesn't exist
+echo [1/5] Creating bin directory if it doesn't exist...
+cd CPU
 if not exist bin mkdir bin
 
-:: Clean previous build
-del /Q bin\*
+:: Clean any previous build artifacts
+echo [2/5] Cleaning previous build artifacts...
+if exist bin\main.exe del /f bin\main.exe
+if exist bin\main.lib del /f bin\main.lib
+if exist bin\main.exp del /f bin\main.exp
 
-:: Compile the CPU implementation
-g++ -o bin/minimal.exe ^
+:: Compile with optimizations
+echo [3/5] Compiling C++ files with optimizations enabled...
+g++ -o bin/main.exe ^
     src/main.cpp ^
     src/noise/perlin_noise.cpp ^
     src/noise/voronoi_noise.cpp ^
@@ -23,20 +27,20 @@ g++ -o bin/minimal.exe ^
     -I include ^
     -O3
 
-:: Check if compilation was successful
-if %ERRORLEVEL% NEQ 0 (
-    echo Compilation failed with error code %ERRORLEVEL%
-    exit /b %ERRORLEVEL%
+:: Check if compilation succeeded
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Compilation failed with error code %errorlevel%
+    exit /b %errorlevel%
 )
 
-:: Run the program with scale=80 and size=4096
-bin\minimal.exe 80 4096
+echo [4/5] Compilation successful!
 
-:: Check if program execution was successful
-if %ERRORLEVEL% NEQ 0 (
-    echo Program execution failed with error code %ERRORLEVEL%
-    exit /b %ERRORLEVEL%
-)
+:: Run the program
+echo [5/5] Running the program...
+cd bin
+main.exe 80 4096
+cd ..
 
 cd ..
-endlocal
+echo ========== Build and Run Complete ==========

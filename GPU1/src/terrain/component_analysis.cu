@@ -37,6 +37,7 @@ __global__ void identifyConnectedComponents(int* terrain, int* labels, int width
 __global__ void propagateLabels(int* terrain, int* labels, int width, int height, bool* changed) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
+    *changed = false; 
     
     if (x < width && y < height) {
         int idx = y * width + x;

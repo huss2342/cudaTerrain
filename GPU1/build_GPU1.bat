@@ -1,4 +1,5 @@
 @echo off
+cd GPU1
 echo ========== TerrainCraft Build Script ==========
 
 :: Create bin directory if it doesn't exist
@@ -14,17 +15,17 @@ if exist bin\main.exp del /f bin\main.exp
 :: Compile with relocatable device code
 echo [3/5] Compiling CUDA files with relocatable device code enabled...
 nvcc -rdc=true -G ^
-src/main.cu ^
-src/terrain/terrain_types.cu ^
-src/terrain/terrain_generator.cu ^
-src/terrain/terrain_smoothing.cu ^
-src/terrain/component_analysis.cu ^
-src/noise/perlin_noise.cu ^
-src/noise/voronoi_noise.cu ^
-src/noise/noise_utils.cu ^
-src/visualization/visualization.cu ^
-src/terrain/terrain_height.cu ^
--o bin/main
+    src/main.cu ^
+    src/terrain/terrain_types.cu ^
+    src/terrain/terrain_generator.cu ^
+    src/terrain/terrain_smoothing.cu ^
+    src/terrain/component_analysis.cu ^
+    src/noise/perlin_noise.cu ^
+    src/noise/voronoi_noise.cu ^
+    src/noise/noise_utils.cu ^
+    src/visualization/visualization.cu ^
+    src/terrain/terrain_height.cu ^
+    -o bin/main
 
 
 :: Check if compilation succeeded
@@ -42,4 +43,5 @@ cd bin
 main.exe 80 4096
 cd ..
 
+cd ..
 echo ========== Build and Run Complete ==========
