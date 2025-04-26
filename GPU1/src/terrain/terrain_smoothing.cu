@@ -113,7 +113,7 @@ __global__ void cleanupSmallPatches(int* terrain, int* output, int width, int he
         int totalCount = 0;
         int neighborTypes[31] = {0}; // to track the most common neighbor type
         
-        const int filterSize = 500;
+        const int filterSize = 400; // reduce from 500 
         const int halfFilterSize = filterSize / 2;
 
         // Use a larger neighborhood to better determine if this is an isolated patch
@@ -183,7 +183,7 @@ __global__ void improvedSmoothTerrain(int* terrain, int* output, int width, int 
         int typeCounts[31] = {0};
         
         // Check a wider radius for better smoothing
-        const int radius = 30;
+        const int radius = 20;
         
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {

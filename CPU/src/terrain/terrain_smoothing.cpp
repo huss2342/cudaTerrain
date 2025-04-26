@@ -120,9 +120,7 @@ void cleanupSmallPatches(int* terrain, int* output, int width, int height, int m
                 int totalCount = 0;
                 int neighborTypes[31] = {0}; // to track the most common neighbor type
                 
-                // Use a smaller filter size than GPU version for better CPU performance
-                // but maintain the algorithm's logic
-                const int filterSize = 50; // Reduced from 500 in GPU version
+                const int filterSize = 400; // reduce from 500 
                 const int halfFilterSize = filterSize / 2;
 
                 // Use a larger neighborhood to better determine if this is an isolated patch
@@ -194,8 +192,7 @@ void improvedSmoothTerrain(int* terrain, int* output, int width, int height) {
                 // Count occurrences of neighboring terrain types
                 int typeCounts[31] = {0};
                 
-                // Use a smaller radius for CPU version but maintain algorithm logic
-                const int radius = 15; // Reduced from 30 in GPU version
+                const int radius = 20; // reducde from 30
                 
                 for (int dy = -radius; dy <= radius; dy++) {
                     for (int dx = -radius; dx <= radius; dx++) {
