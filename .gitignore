@@ -1,9 +1,4 @@
-main.exe
-main.lib
-main.exp
 tempCodeRunnerFile.exp
 tempCodeRunnerFile.lib
 *.ppm
 terrain.ppm
-GPU1/bin
-CPU/bin
