@@ -16,7 +16,7 @@ fi
 
 # Compile with relocatable device code
 echo "[3/5] Compiling CUDA files with relocatable device code enabled..."
-/usr/local/cuda/bin/nvcc -rdc=true -G \
+/usr/local/cuda/bin/nvcc -O3 -rdc=true \
     src/main.cu \
     src/terrain/terrain_types.cu \
     src/terrain/terrain_generator.cu \

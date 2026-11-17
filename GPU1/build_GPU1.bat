@@ -14,7 +14,7 @@ if exist bin\main.exp del /f bin\main.exp
 
 :: Compile with relocatable device code
 echo [3/5] Compiling CUDA files with relocatable device code enabled...
-nvcc -rdc=true -G ^
+nvcc -O3 -rdc=true ^
     src/main.cu ^
     src/terrain/terrain_types.cu ^
     src/terrain/terrain_generator.cu ^
